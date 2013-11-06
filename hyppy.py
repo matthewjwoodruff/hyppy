@@ -24,6 +24,8 @@ This implementation assumes minimization.
 import argparse
 import sys
 
+class TooDeep(Exception): pass
+
 class WFG(object):
     def __init__(self, refpoint):
         """
@@ -32,22 +34,31 @@ class WFG(object):
         """
         self.refpoint = refpoint
 
-    def wfg(self, front):
+    def wfg(self, front, recursion=0):
         """
         return the hypervolume of a front
         front: a list of points
         """
-        return sum(self.exclusive(front, index) 
+        if recursion > 1000:
+            raise TooDeep
+        return sum(self.exclusive(front, index, recursion) 
                    for index in range(len(front)))
 
-    def exclusive(self, front, index):
+    def exclusive(self, front, index, recursion=0):
         """
         return the exclusive hypervolume of a point relative to a front
         front: a list of points
         index: index of a point in the front
         """
+        recursion += 1
+        print "recursion", recursion, "index", index
+        print "front", len(front)
+        limited = limitset(front, index)
+        print "limited", len(limited)
+        reduced_limited = nds(limited)
+        print "reduced", len(reduced_limited)
         return self.inclusive(front[index])\
-               - self.wfg(nds(limitset(front, index)))
+               - self.wfg(reduced_limited, recursion)
 
     def inclusive(self, point):
         """
@@ -66,13 +77,23 @@ def limitset(front, index):
     front: a list of points
     index: an index into the list of points
     """
-    return [[max(p,q) for (p,q) in zip(front[j], front[index])]
-            for j in range(len(front)-index-1)]
+    reduced = []
+    for jj in range(len(front) - index - 1):
+        littlerow = []
+        for p, q in zip(front[jj], front[index]):
+            littlerow.append(max(p,q))
+        reduced.append(littlerow)
+
+    return reduced
 
 def nds(front):
     """
     return the nondominated solutions from a set of points
     """
+    print "sorting front of size {0}".format(len(front))
+    if len(front) <= 1:
+        return front
+    print "really sorting front of size {0}".format(len(front))
     archive = []
 
     for row in front:
@@ -127,10 +148,13 @@ def onlydata(lines):
     """
     yield lines that are data, break if not
     """
+    line = None
     for line in lines:
         if not line.startswith("#"):
             break
-    yield line
+
+    if line is not None:
+        yield line
 
     for line in lines:
         if line.startswith("#"):
@@ -155,8 +179,11 @@ def cli(argv):
     for table in tables:
         print table
         wfg = WFG([0] * len(table[0]))
-        hv = wfg.wfg(table)
-        print hv
+        try:
+            hv = wfg.wfg(table)
+            print hv
+        except TooDeep:
+            pass
 
 if __name__ == "__main__":
     cli(sys.argv)
