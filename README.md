@@ -1,4 +1,4 @@
-pyhypervol
+hyppy
 ==========
 
 Python implementation of the WFG hypervolume algorithm.
