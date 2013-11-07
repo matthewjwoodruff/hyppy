@@ -5,9 +5,7 @@ Python implementation of the WFG hypervolume algorithm.
 
 Assumes minimization.
 
-Takes forever to run.
-
-Has no command-line options.
+Takes forever to run, even if you use PyPy.
 
 Has not been validated.
 
