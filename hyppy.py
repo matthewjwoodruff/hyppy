@@ -122,10 +122,6 @@ def nds(front):
     """
     return the nondominated solutions from a set of points
     """
-    print "sorting front of size {0}".format(len(front))
-    if len(front) <= 1:
-        return front
-    print "really sorting front of size {0}".format(len(front))
     archive = []
 
     for row in front:
@@ -211,11 +207,8 @@ def cli(argv):
     for table in tables:
         print table
         wfg = WFG([0] * len(table[0]))
-        try:
-            hv = wfg.wfg(table)
-            print hv
-        except TooDeep:
-            pass
+        hv = wfg.wfg(table)
+        print hv
 
 if __name__ == "__main__":
     cli(sys.argv)
