@@ -21,27 +21,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 This implementation assumes minimization.
 """
 
-"""
-wfg(pl):
-    return sum {exclhv(pl, k) | k in {1 .. |pl|}}
-
-exclhv(pl, k):
-    return inclhv(pl[k]) - wfg(nds(limitset(pl, k)))
-
-inclhv(p):
-    return product {|p[j] - refPoint[j]| | j in {1 .. n}}
-
-limitset(pl, k):
-    for i = 1 to |pl| - k
-        for j = 1 to n
-            ql[i][j] = worse(pl[k][j], pl[k+i][j])
-    return ql
-
-nds(pl) returns the non-dominated subset of pl
-
-"""
 import argparse
 import sys
+
+class HyppyError(Exception): pass
 
 class WFG(object):
     def __init__(self, refpoint):
@@ -50,6 +33,7 @@ class WFG(object):
         reference point
         """
         self.refpoint = refpoint
+        self.exclusive = self.verbose_exclusive
 
     def wfg(self, front):
         """
@@ -61,6 +45,27 @@ class WFG(object):
         """
         return sum(self.exclusive(front, index)
                    for index in range(len(front)))
+
+    def verbose_exclusive(self, front, index):
+        """ verbose version of exclusive for debugging """
+        incl = self.inclusive(front[index])
+        ls = limitset(front, index)
+        ls_hv = self.wfg(nds(ls))
+        excl = incl - ls_hv
+
+        print("\nfront")
+        for ii in range(len(front)):
+            if index == ii:
+                print("* {0}".format(front[ii]))
+            else:
+                print("  {0}".format(front[ii]))
+        print "limit set"
+        for row in ls:
+            print("  {0}".format(row))
+        print("inclusive hypervolume of front[{0}]: {1}".format(index, incl))
+        print("hypervolume of limit set: {0}".format(ls_hv))
+        print("exclusive hypervolume of front[{0}]: {1}".format(index, excl))
+        return excl
 
     def exclusive(self, front, index):
         """
@@ -89,6 +94,12 @@ class WFG(object):
         return abs(volume)
 
 def verboselimitset(front, index):
+    """
+    for debugging: print out the limit set.
+    Use this by setting limitset=verboselimitset in the 
+    function where you call limitset.  This could break
+    everything.  Use at your own risk.
+    """
     result = limitset(front, index)
     print("front:")
     for ii in range(len(front)):
@@ -155,57 +166,254 @@ def nds(front):
         archive.append(row)
     return archive
 
+def verbose_hv_of(tables):
+    """ yield hypervolume of each table """
+    for table in tables:
+        print("table")
+        for row in table:
+            print(row)
+        referencepoint = [0] * len(table[0])
+        wfg = WFG(referencepoint)
+        yield wfg.wfg(table)
+
+def hv_of(tables):
+    """ yield hypervolume of each table """
+    for table in tables:
+        referencepoint = [0] * len(table[0])
+        wfg = WFG(referencepoint)
+        yield wfg.wfg(table)
+
 def linesof(fp):
     """
-    yield the lines read from a file
+    yield the lines read from a file, with line number
     """
     line = fp.readline()
+    counter = 0
     while line != "":
-        yield line
+        counter += 1
+        yield (counter, line)
         line = fp.readline()
 
-def rowsof(lines, sep=" "):
+def rowsof(lines, delim=" "):
     """
     take a stream of lines and yield a stream of rows
     """
-    for line in lines:
-        yield [float(x) for x in line.split(sep)]
+    number = None
+    for number, line in lines:
+        yield (number, [x for x in line.split(delim)])
 
-def onlydata(lines):
+def onlydata(lines, ts):
     """
     yield lines that are data, break if not
     """
     line = None
-    for line in lines:
-        if not line.startswith("#"):
+    for number, line in lines:
+        if not line.startswith(ts):
             break
 
     if line is not None:
-        yield line
+        yield (number, line)
 
-    for line in lines:
-        if line.startswith("#"):
+    for number, line in lines:
+        if line.startswith(ts):
             break
         else:
-            yield line
+            yield (number, line)
 
-def tables_in(lines):
+def objectives_in(table, objectives):
+    """ yield the objectives in each row """
+    number = None
+    try:
+        if objectives is not None:
+            for (number, row) in table:
+                obj = [float(row[i]) for i in objectives]
+                yield (number, obj)
+        else:
+            for (number, row) in table:
+                obj = [float(x) for x in row]
+                yield (number, obj)
+    except IndexError as ie:
+        msg = "Unable to index objectives on line {0}, error: {1}"
+        raise HyppyError(msg.format(number, ie))
+    except ValueError as ve:
+        msg = "Unable to convert value to float on line {0}, error: {1}"
+        raise HyppyError(msg.format(number, ve))
+    except TypeError as te:
+        msg = "Tried to index with {0} on line {1} of input, error: {2}"
+        raise HyppyError(msg.format(objectives, number, te))
+
+def maximize(table, indices=None):
     """
-    yield tables from lines
+    yield rows of the table with specified indices negated
+    table: rows of objectives
+    indices: indices into the table. None means maximize all
     """
+    number = None
+    if indices is None:
+        for (number, row) in table:
+            yield (number, [-1.0 * x for x in row])
+    else:
+        try:
+            for (number, row) in table:
+                newrow = []
+                for ii in range(len(row)):
+                    if ii in indices:
+                        newrow.append(-1.0 * row[ii])
+                    else:
+                        newrow.append(row[ii])
+                yield (number, newrow)
+        except IndexError as ie:
+            msg = "could not find all maximization objectives on line {0}, error: {1}"
+            raise HyppyError(msg.format(number, ie))
+
+def tables_in(lines, **kwargs):
+    """ yield tables from lines """
+    sep = kwargs.get("separator", None)
+    objectives = kwargs.get("objectives", None)
+    delim = kwargs.get("delimiter", " ")
+    maximize_all = kwargs.get("maximize_all", False)
+    max_indices = kwargs.get("maximize", None)
+
     while True:
-        table = list(rowsof(onlydata(lines)))
+        if sep is not None:
+            data = onlydata(lines, sep)
+        else:
+            data = lines
+        table = rowsof(data, delim)
+        obj = objectives_in(table, objectives)
+
+        if maximize_all:
+            obj = maximize(obj)
+        elif max_indices is not None:
+            obj = maximize(obj, max_indices)
+
+        table = [oo for number, oo in obj]
         if len(table) > 0:
             yield table
         else:
             break
 
+def rerange(intranges):
+    """ convert a set of intranges into a list of integers """
+    if intranges is None:
+        return None
+    thelist = []
+    for therange in intranges:
+        thelist.extend(therange)
+    return thelist
+
+def intrange(arg):
+    """ convert a command-line argument to a list of integers """
+    acceptable_chars = [str(x) for x in range(10)]
+    acceptable_chars.append("-")
+
+    partial = []
+    first = None
+
+    msg = "Could not convert {0} to index range.".format(arg)
+    err = TypeError(msg)
+
+    for char in arg:
+        if char not in acceptable_chars:
+            raise err
+        if char == "-":
+            if len(partial) == 0:
+                raise err
+            elif first is None:
+                first = int("".join(partial))
+                partial = []
+            else: # this means there's a second -, which is not ok
+                raise err
+        else:
+            partial.append(char)
+
+    second = None
+    if first is None:
+        first = int("".join(partial))
+    elif len(partial) == 0:
+        raise err
+    else:
+        second = int("".join(partial))
+
+    if second is None:
+        return [first]
+    elif second - first >= 0:
+        return range(first, second+1)
+    else:
+        return range(first, second-1, -1)
+
+def argparser(name):
+    """ create an argument parser """
+    parser = argparse.ArgumentParser(name)
+    parser.add_argument("inputfile", type=argparse.FileType("r"),
+                        help="file containing sets for which "\
+                             "to compute hypervolume")
+    parser.add_argument('-o', '--objectives', type=intrange, nargs='+',
+                        help='objective columns (zero-indexed)')
+    parser.add_argument('-m', '--maximize', type=intrange, nargs='+',
+                        help='objective columns to maximize')
+    parser.add_argument('-M', '--maximize-all', action="store_true",
+                        help='maximize all objectives')
+    parser.add_argument("--reverse-column-indices", action='store_true',
+                        default=False, help='Reverse the order of column '\
+                        'indices.  May be useful if your objectives are '\
+                        'at the end of a row of unknown length.  Make sure '\
+                        '-e and -m are consistent with the order you '\
+                        'specify.')
+
+    delimiters = parser.add_mutually_exclusive_group()
+    delimiters.add_argument('-d', '--delimiter', type=str, default=' ',
+                        help='input column delimiter, default to space (" ")')
+    delimiters.add_argument('--tabs', action="store_true",
+                        help="use tabs as delimiter")
+
+    parser.add_argument("-s", "--table-separator",
+                        help="character used to separate tables in the input "\
+                             "file, default is '#'",
+                        default = "#")
+    return parser.parse_args
+
+def postprocess(parse):
+    """
+    return a function that parses argv and does postprocessing
+    parse: a function that parses argv
+    """
+    def postprocd(argv):
+        """ the function that parses argv and does postprocessing """
+        args = parse(argv)
+        args.objectives = rerange(args.objectives)
+        args.maximize = rerange(args.maximize)
+        if args.tabs:
+            args.delimiter = "\t"
+        if args.reverse_column_indices:
+            if args.objectives is not None:
+                args.objectives = [-1 - ob for ob in args.objectives]
+            if args.maximize is not None:
+                args.maximize = [-1 - ob for ob in args.maximize]
+        if args.maximize is not None and args.objectives is not None:
+            try:
+                # transform to an index into the objectives
+                args.maximize = [args.objectives.index(i) for i in args.maximize]
+            except ValueError:
+                raise HyppyError("cannot maximize an objective that does not exist")
+        return args
+    return postprocd
 
 def cli(argv):
-    tables = tables_in(linesof(sys.stdin))
-    for table in tables:
-        wfg = WFG([0] * len(table[0]))
-        hv = wfg.wfg(table)
+    """ command-line interface to hyppy """
+    hv_of = verbose_hv_of
+    parse = postprocess(argparser(argv.pop(0)))
+    args = parse(argv)
+
+    lines = linesof(args.inputfile)
+    tables = tables_in(lines,
+                       objectives = args.objectives,
+                       maximize = args.maximize,
+                       maximize_all = args.maximize_all,
+                       delimiter = args.delimiter,
+                       separator = args.table_separator)
+
+    for hv in hv_of(tables):
         print(hv)
 
 if __name__ == "__main__":
