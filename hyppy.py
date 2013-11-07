@@ -91,15 +91,15 @@ class WFG(object):
 
 def verboselimitset(front, index):
     result = limitset(front, index)
-    print "front:"
+    print("front:")
     for ii in range(len(front)):
         if index == ii:
-            print "*", front[ii]
+            print("* {0}".format(front[ii]))
         else:
-            print " ", front[ii]
-    print "limit set:"
+            print("  {0}".format(front[ii]))
+    print("limit set:")
     for row in result:
-        print row
+        print(row)
     return result
 
 def limitset(front, index):
@@ -205,10 +205,9 @@ def tables_in(lines):
 def cli(argv):
     tables = tables_in(linesof(sys.stdin))
     for table in tables:
-        print table
         wfg = WFG([0] * len(table[0]))
         hv = wfg.wfg(table)
-        print hv
+        print(hv)
 
 if __name__ == "__main__":
     cli(sys.argv)
