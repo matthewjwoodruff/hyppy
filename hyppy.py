@@ -33,7 +33,7 @@ class WFG(object):
         reference point
         """
         self.refpoint = refpoint
-        self.exclusive = self.verbose_exclusive
+#        self.exclusive = self.verbose_exclusive
 
     def wfg(self, front):
         """
@@ -125,7 +125,7 @@ def limitset(front, index):
         return ql
 
     """
-    return [[max(p,q) for (p,q) in zip(front[j], front[j+index+1])]
+    return [[max(p,q) for (p,q) in zip(front[index], front[j+index+1])]
             for j in range(len(front)-index-1)]
 
 def nds(front):
@@ -401,7 +401,7 @@ def postprocess(parse):
 
 def cli(argv):
     """ command-line interface to hyppy """
-    hv_of = verbose_hv_of
+    #hv_of = verbose_hv_of
     parse = postprocess(argparser(argv.pop(0)))
     args = parse(argv)
 
