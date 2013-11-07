@@ -71,7 +71,6 @@ class WFG(object):
         exclhv(pl, k):
             return inclhv(pl[k]) - wfg(nds(limitset(pl, k)))
         """
-        limitset=verboselimitset
         return self.inclusive(front[index])\
                - self.wfg(nds(limitset(front, index)))
 
