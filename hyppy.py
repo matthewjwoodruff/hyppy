@@ -21,10 +21,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 This implementation assumes minimization.
 """
 
+"""
+wfg(pl):
+    return sum {exclhv(pl, k) | k in {1 .. |pl|}}
+
+exclhv(pl, k):
+    return inclhv(pl[k]) - wfg(nds(limitset(pl, k)))
+
+inclhv(p):
+    return product {|p[j] - refPoint[j]| | j in {1 .. n}}
+
+limitset(pl, k):
+    for i = 1 to |pl| - k
+        for j = 1 to n
+            ql[i][j] = worse(pl[k][j], pl[k+i][j])
+    return ql
+
+nds(pl) returns the non-dominated subset of pl
+
+"""
 import argparse
 import sys
-
-class TooDeep(Exception): pass
 
 class WFG(object):
     def __init__(self, refpoint):
@@ -34,35 +51,36 @@ class WFG(object):
         """
         self.refpoint = refpoint
 
-    def wfg(self, front, recursion=0):
+    def wfg(self, front):
         """
         return the hypervolume of a front
         front: a list of points
+
+        wfg(pl):
+            return sum {exclhv(pl, k) | k in {1 .. |pl|}}
         """
-        if recursion > 1000:
-            raise TooDeep
-        return sum(self.exclusive(front, index, recursion) 
+        return sum(self.exclusive(front, index)
                    for index in range(len(front)))
 
-    def exclusive(self, front, index, recursion=0):
+    def exclusive(self, front, index):
         """
         return the exclusive hypervolume of a point relative to a front
         front: a list of points
         index: index of a point in the front
+
+        exclhv(pl, k):
+            return inclhv(pl[k]) - wfg(nds(limitset(pl, k)))
         """
-        recursion += 1
-        print "recursion", recursion, "index", index
-        print "front", len(front)
-        limited = limitset(front, index)
-        print "limited", len(limited)
-        reduced_limited = nds(limited)
-        print "reduced", len(reduced_limited)
+        limitset=verboselimitset
         return self.inclusive(front[index])\
-               - self.wfg(reduced_limited, recursion)
+               - self.wfg(nds(limitset(front, index)))
 
     def inclusive(self, point):
         """
         return the product of the difference between all objectives
+
+        inclhv(p):
+            return product {|p[j] - refPoint[j]| | j in {1 .. n}}
         and a reference point
         """
         offset = [p-r for (p,r) in zip(point, self.refpoint)]
@@ -71,20 +89,34 @@ class WFG(object):
             volume *= val
         return abs(volume)
 
+def verboselimitset(front, index):
+    result = limitset(front, index)
+    print "front:"
+    for ii in range(len(front)):
+        if index == ii:
+            print "*", front[ii]
+        else:
+            print " ", front[ii]
+    print "limit set:"
+    for row in result:
+        print row
+    return result
+
 def limitset(front, index):
     """
     return the remainder of the front as limited by the point
     front: a list of points
     index: an index into the list of points
-    """
-    reduced = []
-    for jj in range(len(front) - index - 1):
-        littlerow = []
-        for p, q in zip(front[jj], front[index]):
-            littlerow.append(max(p,q))
-        reduced.append(littlerow)
 
-    return reduced
+    limitset(pl, k):
+        for i = 1 to |pl| - k
+            for j = 1 to n
+                ql[i][j] = worse(pl[k][j], pl[k+i][j])
+        return ql
+
+    """
+    return [[max(p,q) for (p,q) in zip(front[j], front[j+index+1])]
+            for j in range(len(front)-index-1)]
 
 def nds(front):
     """
