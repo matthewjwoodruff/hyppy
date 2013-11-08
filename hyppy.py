@@ -35,6 +35,37 @@ class WFG(object):
         self.refpoint = refpoint
 #        self.exclusive = self.verbose_exclusive
 
+    def iterative(self, table):
+        stack = [] # tuples: front, index, inclusive HV, list of exclusive HVs
+        front = table
+        index = 0
+        excl= []
+        depth = 1
+        hv = 0
+
+        while depth > 0:
+            if index >= len(front): # all points have been processed
+                hv = sum(excl)
+                depth -= 1
+                if depth > 0:
+                    front, index, incl, excl = stack.pop()
+                    excl.append(incl - hv)
+                    index += 1
+            else:
+                point = front[index]
+                incl = self.inclusive(point)
+                limset = nds(limitset(front, index))
+                if len(limset) == 0:
+                    excl.append(incl)
+                    index += 1
+                else:
+                    stack.append((front, index, incl, excl))
+                    front = limset
+                    index = 0
+                    excl = []
+                    depth += 1
+        return hv
+
     def wfg(self, front):
         """
         return the hypervolume of a front
@@ -53,13 +84,13 @@ class WFG(object):
         ls_hv = self.wfg(nds(ls))
         excl = incl - ls_hv
 
-        print("\nfront")
+        print("\nfront {0}".format(len(front)))
         for ii in range(len(front)):
             if index == ii:
                 print("* {0}".format(front[ii]))
             else:
                 print("  {0}".format(front[ii]))
-        print "limit set"
+        print("limit set {0}".format(len(ls)))
         for row in ls:
             print("  {0}".format(row))
         print("inclusive hypervolume of front[{0}]: {1}".format(index, incl))
@@ -169,7 +200,7 @@ def nds(front):
 def verbose_hv_of(tables):
     """ yield hypervolume of each table """
     for table in tables:
-        print("table")
+        print("table {0}".format(len(table)))
         for row in table:
             print(row)
         referencepoint = [0] * len(table[0])
@@ -179,9 +210,11 @@ def verbose_hv_of(tables):
 def hv_of(tables):
     """ yield hypervolume of each table """
     for table in tables:
+#        table.sort(reverse=True) # in place
         referencepoint = [0] * len(table[0])
         wfg = WFG(referencepoint)
-        yield wfg.wfg(table)
+#        yield wfg.wfg(table)
+        yield wfg.iterative(table)
 
 def linesof(fp):
     """
@@ -401,7 +434,7 @@ def postprocess(parse):
 
 def cli(argv):
     """ command-line interface to hyppy """
-    #hv_of = verbose_hv_of
+#    hv_of = verbose_hv_of
     parse = postprocess(argparser(argv.pop(0)))
     args = parse(argv)
 
