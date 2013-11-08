@@ -36,39 +36,55 @@ class WFG(object):
 #        self.exclusive = self.verbose_exclusive
 
     def iterative(self, table):
-        stack = [] # tuples: front, lfront, index, inclusive HV, list of exclusive HVs
+        nobj = len(table[0])
         front = table
         lfront = len(table)
+        stack = [None] * lfront # tuples: front, lfront, index, inclusive HV, list of exclusive HVs
         index = 0
-        excl= []
-        depth = 1
+        excl= [0.0] * lfront
+        depth = 0
         hv = 0
 
-        while depth > 0:
+        while depth >= 0:
             if index >= lfront: # all points have been processed
                 hv = sum(excl)
                 depth -= 1
-                if depth > 0:
-                    front, lfront, index, incl, excl = stack.pop()
-                    excl.append(incl - hv)
+                if depth >= 0:
+                    front, lfront, index, incl, excl = stack[depth]
+                    excl[index] = incl - hv
                     index += 1
             else:
                 point = front[index]
-                incl = self.inclusive(point)
-                limset = limitset(front, index)
-                lls = len(limset)
+                incl = 1.0
+                for jj in xrange(nobj):
+                    incl *= (point[jj] - self.refpoint[jj])
+                incl = abs(incl)
+
+                lls = lfront - index - 1
+                limset = [None]*lls
+                counter = 0
+                for ii in xrange(index+1, lfront):
+                    row = [0.0] * nobj
+                    limset[counter] = row
+                    for jj in xrange(nobj):
+                        if point[jj] > front[ii][jj]:
+                            row[jj] = point[jj]
+                        else:
+                            row[jj] = front[ii][jj]
+                    counter += 1
+                        
                 if lls == 0:
-                    excl.append(incl)
+                    excl[index] = incl
                     index += 1
                 else:
                     if lls > 1:
                         limset = nds(limset)
                         lls = len(limset)
-                    stack.append((front, lfront, index, incl, excl))
+                    stack[depth] = (front, lfront, index, incl, excl)
                     front = limset
                     lfront = lls
                     index = 0
-                    excl = []
+                    excl = [0.0] * lfront
                     depth += 1
         return hv
 
