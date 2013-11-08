@@ -36,31 +36,37 @@ class WFG(object):
 #        self.exclusive = self.verbose_exclusive
 
     def iterative(self, table):
-        stack = [] # tuples: front, index, inclusive HV, list of exclusive HVs
+        stack = [] # tuples: front, lfront, index, inclusive HV, list of exclusive HVs
         front = table
+        lfront = len(table)
         index = 0
         excl= []
         depth = 1
         hv = 0
 
         while depth > 0:
-            if index >= len(front): # all points have been processed
+            if index >= lfront: # all points have been processed
                 hv = sum(excl)
                 depth -= 1
                 if depth > 0:
-                    front, index, incl, excl = stack.pop()
+                    front, lfront, index, incl, excl = stack.pop()
                     excl.append(incl - hv)
                     index += 1
             else:
                 point = front[index]
                 incl = self.inclusive(point)
-                limset = nds(limitset(front, index))
-                if len(limset) == 0:
+                limset = limitset(front, index)
+                lls = len(limset)
+                if lls == 0:
                     excl.append(incl)
                     index += 1
                 else:
-                    stack.append((front, index, incl, excl))
+                    if lls > 1:
+                        limset = nds(limset)
+                        lls = len(limset)
+                    stack.append((front, lfront, index, incl, excl))
                     front = limset
+                    lfront = lls
                     index = 0
                     excl = []
                     depth += 1
@@ -163,23 +169,26 @@ def nds(front):
     """
     return the nondominated solutions from a set of points
     """
-    archive = []
+    fsize = len(front)
+    if fsize < 2:
+        return front
+    nobj = len(front[0])
+    archive = [False] * fsize
 
-    for row in front:
-        asize = len(archive)
-        ai = -1
-        while ai < asize - 1:
-            ai += 1
+    for sol in xrange(fsize):
+        for arc in xrange(fsize):
+            if not archive[arc]:
+                continue
             adominate = False
             sdominate = False
             nondominate = False
-            for arc, sol in zip(archive[ai], row):
-                if arc < sol:
+            for ii in xrange(nobj):
+                if front[arc][ii] < front[sol][ii]:
                     adominate = True
                     if sdominate:
                         nondominate = True
                         break # stop comparing objectives
-                elif arc > sol:
+                elif front[arc][ii] > front[sol][ii]:
                     sdominate = True
                     if adominate:
                         nondominate = True
@@ -189,13 +198,11 @@ def nds(front):
             if adominate:
                 break    # row is dominated
             if sdominate:
-                archive.pop(ai)
-                ai -= 1
-                asize -= 1
+                archive[arc] = False
                 continue # compare next archive solution
         # if the solution made it all the way through, keep it
-        archive.append(row)
-    return archive
+        archive[sol] = True
+    return [front[sol] for sol in xrange(fsize) if archive[sol]]
 
 def verbose_hv_of(tables):
     """ yield hypervolume of each table """
