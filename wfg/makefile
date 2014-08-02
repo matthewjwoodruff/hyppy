@@ -5,24 +5,26 @@ OPT = -O3
 DEBUG = -g -Werror -pedantic
 
 march_error = $(error please define an architecture, e.g., 'make march=pentium')
+ifdef ARCH
+	OPT=$(ARCH) $(COPT)
+else
+	ifdef march
+		OPT += -march=$(march)
+	endif
+endif
 
 
 CC = gcc
 CFLAGS = -std=c99 -Wall
 
-$(EXE): $(OBJ) wfg.c wfg.h wfgmain.c
-	ifdef ARCH
-		OPT=$(ARCH) $(COPT)
-	else
-		ifndef march 
-			$(march_error)
-		endif
-		OPT += -march=$(march)
-	endif
+$(EXE): $(OBJ) wfg.c wfg.h wfgmain.c architecture
 	$(CC) $(CFLAGS) $(OPT) -Dopt=0 -o wfg0 wfg.c wfgmain.c $(OBJ)
 	$(CC) $(CFLAGS) $(OPT) -Dopt=1 -o wfg1 wfg.c wfgmain.c $(OBJ)
 	$(CC) $(CFLAGS) $(OPT) -Dopt=2 -o wfg2 wfg.c wfgmain.c $(OBJ)
 	$(CC) $(CFLAGS) $(OPT) -Dopt=3 -o wfg3 wfg.c wfgmain.c $(OBJ)
+
+architecture:
+	$(if $(march), , $(march_error))
 
 wfg2.so: wfg.c wfg.h
 	$(CC) -Dopt=2 -fPIC -shared wfg.c -o wfg2.so
