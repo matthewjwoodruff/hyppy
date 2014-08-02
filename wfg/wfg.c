@@ -33,8 +33,6 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <math.h>
-#include <sys/time.h>
-#include <sys/resource.h>
 #include "wfg.h"
 #include "avl.h"
 
@@ -51,7 +49,7 @@
 #define WORSE(x,y)   (BEATS(y,x) ? (x) : (y)) 
 #define BETTER(x,y)  (BEATS(y,x) ? (y) : (x)) 
 
-int n;     // the number of objectives 
+int nobj;     // the number of objectives 
 POINT ref; // the reference point 
 
 FRONT *fs;      // memory management stuff 
@@ -61,10 +59,10 @@ int maxm = 0;   // identify the biggest fronts in the file
 int maxn = 0;
 
 
-static avl_tree_t *tree;
+avl_tree_t *tree;
 double hv(FRONT);
 
-static int compare_tree_asc( const void *p1, const void *p2)
+int compare_tree_asc( const void *p1, const void *p2)
 {
     const double x1= *((const double *)p1+1);
     const double x2= *((const double *)p2+1);
@@ -80,9 +78,9 @@ int greater(const void *v1, const void *v2)
   POINT p = *(POINT*)v1;
   POINT q = *(POINT*)v2;
   #if opt == 1
-  for (int i = n - fr - 1; i >= 0; i--)
+  for (int i = nobj - fr - 1; i >= 0; i--)
   #else
-  for (int i = n - 1; i >= 0; i--)
+  for (int i = nobj - 1; i >= 0; i--)
   #endif
     if BEATS(p.objectives[i],q.objectives[i]) return  1;
     else
@@ -96,9 +94,9 @@ int dominates2way(POINT p, POINT q)
 {
   // domination could be checked in either order 
   #if opt == 1
-  for (int i = n - fr - 1; i >= 0; i--)
+  for (int i = nobj - fr - 1; i >= 0; i--)
   #else
-  for (int i = n - 1; i >= 0; i--)
+  for (int i = nobj - 1; i >= 0; i--)
   #endif
     if BEATS(p.objectives[i],q.objectives[i]) 
       {for (int j = i - 1; j >= 0; j--) 
@@ -130,7 +128,7 @@ void makeDominatedBit(FRONT ps, int p)
 
   int z = ps.nPoints - 1 - p;
   for (int i = 0; i < z; i++)
-    for (int j = 0; j < n; j++) 
+    for (int j = 0; j < nobj; j++) 
       fs[fr].points[i].objectives[j] = WORSE(ps.points[p].objectives[j],ps.points[p + 1 + i].objectives[j]); 
   POINT t;
   fs[fr].nPoints = 1;
@@ -282,7 +280,7 @@ double inclhv(POINT p)
 // returns the inclusive hypervolume of p
 {
   double volume = 1;
-  for (int i = 0; i < n; i++) 
+  for (int i = 0; i < nobj; i++) 
     volume *= fabs(p.objectives[i] - ref.objectives[i]);
   return volume;
 }
@@ -310,9 +308,9 @@ double hv(FRONT ps)
   #endif
 
   #if opt == 2
-  if (n == 2) return hv2(ps);
+  if (nobj == 2) return hv2(ps);
   #elif opt == 3
-  if (n == 3) return hv3_AVL(ps);
+  if (nobj == 3) return hv3_AVL(ps);
   #endif
 
   double volume = 0;
@@ -320,91 +318,37 @@ double hv(FRONT ps)
   #if opt <= 1
   for (int i = 0; i < ps.nPoints; i++) volume += exclhv(ps, i);
   #else
-  n--;
+  nobj--;
   for (int i = ps.nPoints - 1; i >= 0; i--)
     // we can ditch dominated points here, 
     // but they will be ditched anyway in dominatedBit 
-    volume += fabs(ps.points[i].objectives[n] - ref.objectives[n]) * exclhv(ps, i);
+    volume += fabs(ps.points[i].objectives[nobj] - ref.objectives[nobj]) * exclhv(ps, i);
 
-  n++; 
+  nobj++; 
   #endif
 
   return volume;
 }
 
+void cleanup_point(POINT* point){
+	/* release the memory for a point */
+	free(point->tnode);
+	free(point->objectives);
 
-int main(int argc, char *argv[]) 
-// processes each front from the file 
-{
-  FILECONTENTS *f = readFile(argv[1]);
-
-  // find the biggest fronts
-  for (int i = 0; i < f->nFronts; i++)
-    {if (f->fronts[i].nPoints > maxm) maxm = f->fronts[i].nPoints;
-     if (f->fronts[i].n       > maxn) maxn = f->fronts[i].n;
-    }
-
-  // allocate memory
-  #if opt == 0
-  fs = malloc(sizeof(FRONT) * maxm);
-  #else
-
-  // slicing (opt > 1) saves a level of recursion
-  int maxd = maxn - (opt / 2 + 1); 
-  fs = malloc(sizeof(FRONT) * maxd);
-
-  // 3D base (opt = 3) needs space for the sentinels
-  int maxp = maxm + 2 * (opt / 3);
-  //int maxp = 100000;
-  for (int i = 0; i < maxd; i++) 
-    {fs[i].points = malloc(sizeof(POINT) * maxp); 
-     for (int j = 0; j < maxp; j++) 
-     {
-       fs[i].points[j].tnode = malloc(sizeof(avl_node_t));
-       // slicing (opt > 1) saves one extra objective at each level
-       fs[i].points[j].objectives = malloc(sizeof(OBJECTIVE) * (maxn - (i + 1) * (opt / 2)));
-     }
-    }
-  #endif
-
-  tree = avl_alloc_tree ((avl_compare_t) compare_tree_asc,
-                         (avl_freeitem_t) free);
-
-  // initialise the reference point
-  ref.objectives = malloc(sizeof(OBJECTIVE) * maxn);
-  ref.tnode = malloc(sizeof(avl_node_t));
-  if (argc == 2)
-    {printf("No reference point provided: using the origin\n");
-     for (int i = 0; i < maxn; i++) ref.objectives[i] = 0;
-    }
-  else if (argc - 2 != maxn)
-    {printf("Your reference point should have %d values\n", maxn);
-     return 0;
-    }
-  else 
-  for (int i = 2; i < argc; i++) ref.objectives[i - 2] = atof(argv[i]);
-
-  for (int i = 0; i < f->nFronts; i++) 
-    {      
-      struct timeval tv1, tv2;
-      struct rusage ru_before, ru_after;
-      getrusage (RUSAGE_SELF, &ru_before);
- 
-      n = f->fronts[i].n;
-      #if opt >= 3
-      if (n == 2)
-        {qsort(f->fronts[i].points, f->fronts[i].nPoints, sizeof(POINT), greater);
-         printf("hv(%d) = %1.10f\n", i+1, hv2(f->fronts[i])); 
-        }
-      else
-      #endif
-      printf("hv(%d) = %1.10f\n", i+1, hv(f->fronts[i])); 
-
-      getrusage (RUSAGE_SELF, &ru_after);
-      tv1 = ru_before.ru_utime;
-      tv2 = ru_after.ru_utime;
-      printf("Time: %f (s)\n", tv2.tv_sec + tv2.tv_usec * 1e-6 - tv1.tv_sec - tv1.tv_usec * 1e-6);
-    }
-
-  return 0;
+}
+void cleanup_front(FRONT* front){
+	/* release the memory for the front */
+	for(int ii=0; ii<front->nPoints; ii++){
+		POINT* point = &(front->points[ii]);
+		cleanup_point(point);
+	}
+	free(front->points);
+}
+void cleanup_filecontents(FILECONTENTS* filecontents){
+	/* release the memory for the contents of a file */
+	for(int ii=0; ii<filecontents->nFronts; ii++){
+		FRONT* front = &(filecontents->fronts[ii]);
+		cleanup_front(front);
+	}
+	free(filecontents->fronts);
 }

@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "avl.h"
 
 typedef double OBJECTIVE;
 
@@ -28,6 +29,19 @@ typedef struct
 
 FILECONTENTS *readFile(char[]);
 
-extern void printContents(FILECONTENTS *);
+void printContents(FILECONTENTS *);
+
+int compare_tree_asc( const void *p1, const void *p2);
+double hv(FRONT ps);
+double hv2(FRONT ps);
+int greater(const void *v1, const void *v2);
+void cleanup_filecontents(FILECONTENTS* filecontents);
+
+extern int maxm;
+extern int maxn;
+extern FRONT* fs;
+extern avl_tree_t *tree;
+extern POINT ref;
+extern int nobj;
 
 #endif

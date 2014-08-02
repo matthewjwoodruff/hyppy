@@ -2,29 +2,44 @@ EXE = wfg
 OBJ = read.o avl.o 
 
 OPT = -O3 
-
-
+DEBUG = -g -Werror -pedantic
 
 march_error = $(error please define an architecture, e.g., 'make march=pentium')
-ifdef ARCH
-OPT=$(ARCH) $(COPT)
-else
-ifndef march 
-  $(march_error)
-  endif
-  OPT += -march=$(march)
-endif
 
 
-#OPT = -g
-#CC = gcc -std=c99 -Wall -pedantic -Werror -lm -O5
-CC = gcc -std=c99 -Wall  $(OPT)
+CC = gcc
+CFLAGS = -std=c99 -Wall
 
-$(EXE): $(OBJ) wfg.c
-	$(CC) -Dopt=0 -o wfg0 wfg.c $(OBJ)
-	$(CC) -Dopt=1 -o wfg1 wfg.c $(OBJ)
-	$(CC) -Dopt=2 -o wfg2 wfg.c $(OBJ)
-	$(CC) -Dopt=3 -o wfg3 wfg.c $(OBJ)
+$(EXE): $(OBJ) wfg.c wfg.h wfgmain.c
+	ifdef ARCH
+		OPT=$(ARCH) $(COPT)
+	else
+		ifndef march 
+			$(march_error)
+		endif
+		OPT += -march=$(march)
+	endif
+	$(CC) $(CFLAGS) $(OPT) -Dopt=0 -o wfg0 wfg.c wfgmain.c $(OBJ)
+	$(CC) $(CFLAGS) $(OPT) -Dopt=1 -o wfg1 wfg.c wfgmain.c $(OBJ)
+	$(CC) $(CFLAGS) $(OPT) -Dopt=2 -o wfg2 wfg.c wfgmain.c $(OBJ)
+	$(CC) $(CFLAGS) $(OPT) -Dopt=3 -o wfg3 wfg.c wfgmain.c $(OBJ)
+
+wfg2.so: wfg.c wfg.h
+	$(CC) -Dopt=2 -fPIC -shared wfg.c -o wfg2.so
+
+debug: wfg0debug wfg1debug wfg2debug wfg3debug
+
+wfg0debug: wfg.c wfg.h wfgmain.c read.c avl.c
+	$(CC) $(CFLAGS) $(DEBUG)  -Dopt=0 -o wfg0debug wfg.c wfgmain.c read.c avl.c
+wfg1debug: wfg.c wfg.h wfgmain.c read.c avl.c
+	$(CC) $(CFLAGS) $(DEBUG)  -Dopt=1 -o wfg1debug wfg.c wfgmain.c read.c avl.c
+wfg2debug: wfg.c wfg.h wfgmain.c read.c avl.c
+	$(CC) $(CFLAGS) $(DEBUG)  -Dopt=2 -o wfg2debug wfg.c wfgmain.c read.c avl.c
+wfg3debug: wfg.c wfg.h wfgmain.c read.c avl.c
+	$(CC) $(CFLAGS) $(DEBUG)  -Dopt=3 -o wfg3debug wfg.c wfgmain.c read.c avl.c
+
+valgrind: debug
+	valgrind -v --leak-check=full --show-reachable=yes ./wfg2debug ../random/3d/ran.50pts.3d.20 
 
 %.o: %.c
 	$(CC) -c $<

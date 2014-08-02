@@ -206,7 +206,8 @@ void avl_free_nodes(avl_tree_t *avltree) {
 			freeitem(node->item);
 		free(node);
 	}
-	return avl_clear_tree(avltree);
+	avl_clear_tree(avltree);
+	return;
 }
 
 /*
