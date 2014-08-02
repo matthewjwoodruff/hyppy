@@ -32,10 +32,9 @@ FILECONTENTS *readFile(char[]);
 void printContents(FILECONTENTS *);
 
 int compare_tree_asc( const void *p1, const void *p2);
-double hv(FRONT ps);
-double hv2(FRONT ps);
 int greater(const void *v1, const void *v2);
 void cleanup_filecontents(FILECONTENTS* filecontents);
+double compute_hypervolume(FRONT* front);
 
 extern int maxm;
 extern int maxn;

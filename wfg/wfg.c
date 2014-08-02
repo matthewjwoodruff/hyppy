@@ -352,3 +352,17 @@ void cleanup_filecontents(FILECONTENTS* filecontents){
 	}
 	free(filecontents->fronts);
 }
+
+double compute_hypervolume(FRONT* front)
+{
+	/* wrap the calls to hv / hv2 so that we 
+	don't need to share globals */
+	nobj = front->n;
+	#if opt >= 3
+	if (nobj == 2){
+		qsort(front->points, front->nPoints, sizeof(POINT), greater);
+		return hv2(*front);
+        }
+	#endif
+	return hv(*front);
+}
