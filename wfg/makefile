@@ -27,7 +27,7 @@ architecture:
 	$(if $(march), , $(march_error))
 
 wfg2.so: wfg.c wfg.h
-	$(CC) -Dopt=2 -fPIC -shared wfg.c -o wfg2.so
+	$(CC) $(CFLAGS) -Dopt=2 -fPIC -shared wfg.c -o wfg2.so
 
 debug: wfg0debug wfg1debug wfg2debug wfg3debug
 
@@ -44,7 +44,7 @@ valgrind: debug
 	valgrind -v --leak-check=full --show-reachable=yes ./wfg2debug ../random/3d/ran.50pts.3d.20 
 
 %.o: %.c
-	$(CC) -c $<
+	$(CC) $(CFLAGS) -c $<
 
 clean: 
 	rm -f wfg[0-4] exc[0-4] *.o 

@@ -5,6 +5,7 @@
 int main(int argc, char *argv[]) 
 // processes each front from the file 
 {
+  // read.c allocates the FRONTs
   FILECONTENTS *f = readFile(argv[1]); // do this in python
 
   // find the biggest fronts
@@ -15,12 +16,19 @@ int main(int argc, char *argv[])
   // objectives it has.
   // That's fine.  From the C perspective we're getting a simple-minded array, 
   // and we're just going to follow read.c to build the front structure.
+  //
+
+  // Here, we're figuring out how much space to allocate for the "stack"
+  // of fronts.  I think this is taking the allocate-once optimization
+  // overboard.  The big expense is not allocating space for these fronts,
+  // as long as you do it once per hypervolume computation.
   for (int i = 0; i < f->nFronts; i++)
     {if (f->fronts[i].nPoints > maxm) maxm = f->fronts[i].nPoints;
      if (f->fronts[i].n       > maxn) maxn = f->fronts[i].n;
     }
 
-  // allocate memory
+  // allocate memory for the FRONTs: enough for as many FRONTS 
+  // as there are points in the biggest front
   #if opt == 0
     fs = malloc(sizeof(FRONT) * maxm);
   #else
