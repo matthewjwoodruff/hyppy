@@ -27,8 +27,10 @@ int main(int argc, char *argv[])
      if (f->fronts[i].n       > maxn) maxn = f->fronts[i].n;
     }
 
-  // allocate memory for the FRONTs: enough for as many FRONTS 
-  // as there are points in the biggest front
+  // Allocate memory for the FRONTs: enough for as many FRONTS 
+  // as there are points in the biggest front.
+  // What I'm going to change is that we'll just allocate enough 
+  // for the current front.
   #if opt == 0
     fs = malloc(sizeof(FRONT) * maxm);
   #else
