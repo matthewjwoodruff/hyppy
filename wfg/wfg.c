@@ -49,11 +49,10 @@
 #define WORSE(x,y)   (BEATS(y,x) ? (x) : (y)) 
 #define BETTER(x,y)  (BEATS(y,x) ? (y) : (x)) 
 
-int nobj;     // the number of objectives 
 POINT ref; // the reference point 
 
 FRONT *fs;	// treat as an array of FRONTs
-int len_fs;
+int len_fs = 0;
 int fr = 0;     // current depth 
 int frmax = -1; // max depth malloced so far (for opt = 0) 
 int maxm = 0;   // size of the biggest front we're going to have to deal with
@@ -391,6 +390,14 @@ double compute_hypervolume(FRONT* front, POINT* referencepoint)
 {
   /* wrap the calls to hv / hv2 so that we 
   don't need to share globals */
+  // reinitialize globals
+  len_fs = 0;
+  fr = 0;     // current depth 
+  frmax = -1; // max depth malloced so far (for opt = 0) 
+  maxm = 0;   // size of the biggest front we're going to have to deal with
+  nobj = 0;   // nobj for the biggest front we're going to have to deal with
+
+  // recompute globals
   nobj = front->n;
   ref = *referencepoint;
   tree = avl_alloc_tree ((avl_compare_t) compare_tree_asc,
