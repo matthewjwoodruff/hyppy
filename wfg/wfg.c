@@ -137,15 +137,15 @@ void makeDominatedBit(FRONT ps, int p)
      bool keep = true;
      while (j < fs[fr].nPoints && keep)
        switch (dominates2way(fs[fr].points[i], fs[fr].points[j]))
-	 {case -1: t = fs[fr].points[j];
+   {case -1: t = fs[fr].points[j];
                    fs[fr].nPoints--; 
                    fs[fr].points[j] = fs[fr].points[fs[fr].nPoints]; 
                    fs[fr].points[fs[fr].nPoints] = t; 
                    break;
           case  0: j++; break;
           // case  2: printf("Identical points!\n");
-	  default: keep = false;
-	 }
+    default: keep = false;
+   }
      if (keep) {t = fs[fr].points[fs[fr].nPoints]; 
                 fs[fr].points[fs[fr].nPoints] = fs[fr].points[i]; 
                 fs[fr].points[i] = t; 
@@ -331,38 +331,38 @@ double hv(FRONT ps)
 }
 
 void cleanup_point(POINT* point){
-	/* release the memory for a point */
-	free(point->tnode);
-	free(point->objectives);
+  /* release the memory for a point */
+  free(point->tnode);
+  free(point->objectives);
 
 }
 void cleanup_front(FRONT* front){
-	/* release the memory for the front */
-	for(int ii=0; ii<front->nPoints; ii++){
-		POINT* point = &(front->points[ii]);
-		cleanup_point(point);
-	}
-	free(front->points);
+  /* release the memory for the front */
+  for(int ii=0; ii<front->nPoints; ii++){
+    POINT* point = &(front->points[ii]);
+    cleanup_point(point);
+  }
+  free(front->points);
 }
 void cleanup_filecontents(FILECONTENTS* filecontents){
-	/* release the memory for the contents of a file */
-	for(int ii=0; ii<filecontents->nFronts; ii++){
-		FRONT* front = &(filecontents->fronts[ii]);
-		cleanup_front(front);
-	}
-	free(filecontents->fronts);
+  /* release the memory for the contents of a file */
+  for(int ii=0; ii<filecontents->nFronts; ii++){
+    FRONT* front = &(filecontents->fronts[ii]);
+    cleanup_front(front);
+  }
+  free(filecontents->fronts);
 }
 
 double compute_hypervolume(FRONT* front)
 {
-	/* wrap the calls to hv / hv2 so that we 
-	don't need to share globals */
-	nobj = front->n;
-	#if opt >= 3
-	if (nobj == 2){
-		qsort(front->points, front->nPoints, sizeof(POINT), greater);
-		return hv2(*front);
+  /* wrap the calls to hv / hv2 so that we 
+  don't need to share globals */
+  nobj = front->n;
+  #if opt >= 3
+  if (nobj == 2){
+    qsort(front->points, front->nPoints, sizeof(POINT), greater);
+    return hv2(*front);
         }
-	#endif
-	return hv(*front);
+  #endif
+  return hv(*front);
 }
