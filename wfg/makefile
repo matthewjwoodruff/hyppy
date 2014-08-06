@@ -1,5 +1,5 @@
 EXE = wfg
-OBJ = read.o avl.o 
+OBJ = avl.o 
 
 OPT = -O3 
 DEBUG = -g -Werror -pedantic
@@ -31,14 +31,14 @@ wfg2.so: wfg.c wfg.h
 
 debug: wfg0debug wfg1debug wfg2debug wfg3debug
 
-wfg0debug: wfg.c wfg.h wfgmain.c read.c avl.c
-	$(CC) $(CFLAGS) $(DEBUG)  -Dopt=0 -o wfg0debug wfg.c wfgmain.c read.c avl.c
-wfg1debug: wfg.c wfg.h wfgmain.c read.c avl.c
-	$(CC) $(CFLAGS) $(DEBUG)  -Dopt=1 -o wfg1debug wfg.c wfgmain.c read.c avl.c
-wfg2debug: wfg.c wfg.h wfgmain.c read.c avl.c
-	$(CC) $(CFLAGS) $(DEBUG)  -Dopt=2 -o wfg2debug wfg.c wfgmain.c read.c avl.c
-wfg3debug: wfg.c wfg.h wfgmain.c read.c avl.c
-	$(CC) $(CFLAGS) $(DEBUG)  -Dopt=3 -o wfg3debug wfg.c wfgmain.c read.c avl.c
+wfg0debug: wfg.c wfg.h wfgmain.c avl.c
+	$(CC) $(CFLAGS) $(DEBUG)  -Dopt=0 -o wfg0debug wfg.c wfgmain.c avl.c
+wfg1debug: wfg.c wfg.h wfgmain.c avl.c
+	$(CC) $(CFLAGS) $(DEBUG)  -Dopt=1 -o wfg1debug wfg.c wfgmain.c avl.c
+wfg2debug: wfg.c wfg.h wfgmain.c avl.c
+	$(CC) $(CFLAGS) $(DEBUG)  -Dopt=2 -o wfg2debug wfg.c wfgmain.c avl.c
+wfg3debug: wfg.c wfg.h wfgmain.c avl.c
+	$(CC) $(CFLAGS) $(DEBUG)  -Dopt=3 -o wfg3debug wfg.c wfgmain.c avl.c
 
 valgrind: debug
 	valgrind -v --leak-check=full --show-reachable=yes ./wfg2debug ../random/3d/ran.50pts.3d.20 
