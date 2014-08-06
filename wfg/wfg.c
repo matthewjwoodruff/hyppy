@@ -391,6 +391,7 @@ double compute_hypervolume(FRONT* front, POINT* referencepoint)
   /* wrap the calls to hv / hv2 so that we 
   don't need to share globals */
   // reinitialize globals
+  fs = NULL;
   len_fs = 0;
   fr = 0;     // current depth 
   frmax = -1; // max depth malloced so far (for opt = 0) 
@@ -400,6 +401,7 @@ double compute_hypervolume(FRONT* front, POINT* referencepoint)
   // recompute globals
   nobj = front->n;
   ref = *referencepoint;
+
   tree = avl_alloc_tree ((avl_compare_t) compare_tree_asc,
                          (avl_freeitem_t) free);
   /* end wrapping of globals */
