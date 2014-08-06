@@ -1,2 +1,4 @@
 The zero reference point was being allocated with zero objectives.
 Fixing that fixed the issue.
+However, wfg0 and wfg3 segfault.
+In addition wfg3 gives wrong answers :(
