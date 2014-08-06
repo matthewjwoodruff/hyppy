@@ -53,6 +53,7 @@ int nobj;     // the number of objectives
 POINT ref; // the reference point 
 
 FRONT *fs;	// treat as an array of FRONTs
+int len_fs;
 int fr = 0;     // current depth 
 int frmax = -1; // max depth malloced so far (for opt = 0) 
 int maxm = 0;   // size of the biggest front we're going to have to deal with
@@ -361,12 +362,14 @@ FRONT* allocate_fronts(){
   */
   FRONT* frontstack;
   #if opt == 0
-    frontstack = malloc(sizeof(FRONT) * maxm);
+    len_fs = maxm;
+    frontstack = malloc(sizeof(FRONT) * len_fs);
   #else
 
     // slicing (opt > 1) saves a level of recursion
     int maxd = nobj - (opt / 2 + 1); 
-    frontstack = malloc(sizeof(FRONT) * maxd);
+    len_fs = maxd;
+    frontstack = malloc(sizeof(FRONT) * len_fs);
 
     // 3D base (opt = 3) needs space for the sentinels
     int maxp = maxm + 2 * (opt / 3);
@@ -405,7 +408,7 @@ double compute_hypervolume(FRONT* front, POINT* referencepoint)
   #endif
   double computed_hypervolume = hv(*front);
   avl_free_nodes(tree);
-  for(int ii = 0; ii<maxm; ii++){
+  for(int ii = 0; ii<len_fs; ii++){
     cleanup_front(&fs[ii]);
   }
   return computed_hypervolume;
