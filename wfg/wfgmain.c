@@ -124,7 +124,7 @@ int main(int argc, char *argv[])
     zero_refpoint.objectives = malloc(sizeof(OBJECTIVE) * currentfront->n);
     zero_refpoint.tnode = malloc(sizeof(avl_node_t));
 
-    for (int i = 0; i < refobj; i++) {
+    for (int i = 0; i < currentfront->n; i++) {
       zero_refpoint.objectives[i] = 0.0;
     }
 
