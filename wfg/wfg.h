@@ -34,13 +34,7 @@ void printContents(FILECONTENTS *);
 int compare_tree_asc( const void *p1, const void *p2);
 int greater(const void *v1, const void *v2);
 void cleanup_filecontents(FILECONTENTS* filecontents);
-double compute_hypervolume(FRONT* front);
-
-extern int maxm;
-extern int maxn;
-extern FRONT* fs;
-extern avl_tree_t *tree;
-extern POINT ref;
-extern int nobj;
+void cleanup_point(POINT* point);
+double compute_hypervolume(FRONT* front, POINT* referencepoint);
 
 #endif

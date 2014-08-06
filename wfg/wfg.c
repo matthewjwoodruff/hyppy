@@ -52,11 +52,11 @@
 int nobj;     // the number of objectives 
 POINT ref; // the reference point 
 
-FRONT *fs;      // memory management stuff 
+FRONT *fs;	// treat as an array of FRONTs
 int fr = 0;     // current depth 
 int frmax = -1; // max depth malloced so far (for opt = 0) 
-int maxm = 0;   // identify the biggest fronts in the file 
-int maxn = 0;
+int maxm = 0;   // size of the biggest front we're going to have to deal with
+int nobj = 0;   // nobj for the biggest front we're going to have to deal with
 
 
 avl_tree_t *tree;
@@ -121,7 +121,7 @@ void makeDominatedBit(FRONT ps, int p)
      fs[fr].points = malloc(sizeof(POINT) * maxm);
      for (int j = 0; j < maxm; j++) 
      {
-       fs[fr].points[j].objectives = malloc(sizeof(OBJECTIVE) * maxn);
+       fs[fr].points[j].objectives = malloc(sizeof(OBJECTIVE) * nobj);
      }
     }
   #endif
@@ -353,16 +353,60 @@ void cleanup_filecontents(FILECONTENTS* filecontents){
   free(filecontents->fronts);
 }
 
-double compute_hypervolume(FRONT* front)
+FRONT* allocate_fronts(){
+  /* allocate the stack of fronts for doing one hypervolume
+   * computation.
+   * enough for as many FRONTS 
+   * as there are points in the biggest front.
+  */
+  FRONT* frontstack;
+  #if opt == 0
+    frontstack = malloc(sizeof(FRONT) * maxm);
+  #else
+
+    // slicing (opt > 1) saves a level of recursion
+    int maxd = nobj - (opt / 2 + 1); 
+    frontstack = malloc(sizeof(FRONT) * maxd);
+
+    // 3D base (opt = 3) needs space for the sentinels
+    int maxp = maxm + 2 * (opt / 3);
+    //int maxp = 100000;
+    for (int i = 0; i < maxd; i++) 
+      {frontstack[i].points = malloc(sizeof(POINT) * maxp); 
+       for (int j = 0; j < maxp; j++) 
+       {
+         frontstack[i].points[j].tnode = malloc(sizeof(avl_node_t));
+         // slicing (opt > 1) saves one extra objective at each level
+         frontstack[i].points[j].objectives = malloc(sizeof(OBJECTIVE) * (nobj - (i + 1) * (opt / 2)));
+       }
+      }
+  #endif
+  return frontstack;
+}
+
+double compute_hypervolume(FRONT* front, POINT* referencepoint)
 {
   /* wrap the calls to hv / hv2 so that we 
   don't need to share globals */
   nobj = front->n;
+  ref = *referencepoint;
+  tree = avl_alloc_tree ((avl_compare_t) compare_tree_asc,
+                         (avl_freeitem_t) free);
+  /* end wrapping of globals */
+  maxm = front->nPoints;
+
+  fs = allocate_fronts();
+
   #if opt >= 3
   if (nobj == 2){
     qsort(front->points, front->nPoints, sizeof(POINT), greater);
     return hv2(*front);
         }
   #endif
-  return hv(*front);
+  double computed_hypervolume = hv(*front);
+  avl_free_nodes(tree);
+  for(int ii = 0; ii<maxm; ii++){
+    cleanup_front(&fs[ii]);
+  }
+  return computed_hypervolume;
 }
