@@ -1,3 +1,2 @@
-This vesion gets the right hypervolume for the first front only.
-I'm trying to figure out what state persists between runs.
-Is it the reference point?
+The zero reference point was being allocated with zero objectives.
+Fixing that fixed the issue.
