@@ -143,6 +143,7 @@ int main(int argc, char *argv[])
     tv2 = ru_after.ru_utime;
     printf("Time: %f (s)\n", tv2.tv_sec + tv2.tv_usec * 1e-6 - tv1.tv_sec - tv1.tv_usec * 1e-6);
   }
+  cleanup_point(&given_refpoint);
   cleanup_filecontents(f);
   free(f);
 

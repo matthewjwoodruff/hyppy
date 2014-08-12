@@ -416,9 +416,12 @@ double compute_hypervolume(FRONT* front, POINT* referencepoint)
         }
   #endif
   double computed_hypervolume = hv(*front);
-  avl_free_nodes(tree);
+  avl_free_tree(tree);
+  #if opt > 0
   for(int ii = 0; ii<len_fs; ii++){
     cleanup_front(&fs[ii]);
   }
+  #endif
+  free(fs);
   return computed_hypervolume;
 }
