@@ -1,4 +1,88 @@
-The zero reference point was being allocated with zero objectives.
-Fixing that fixed the issue.
-However, wfg0 and wfg3 segfault.
+wfg3 segfaults
 In addition wfg3 gives wrong answers :(
+Everything leaks memory now.
+Allocating only one front is a red herring --- has to do with the number of objectives.
+
+The interesting thing here is that wfg0 allocates as it goes.  Does it only sometimes fail to clean up?
+
+Ah, but look.  The leak for wfg2 is the same sort of thing, the objectives are leaking.
+
+
+
+==807== Memcheck, a memory error detector
+==807== Copyright (C) 2002-2013, and GNU GPL'd, by Julian Seward et al.
+==807== Using Valgrind-3.9.0 and LibVEX; rerun with -h for copyright info
+==807== Command: ./wfg0debug ran.50pts.3d.20
+==807== 
+==807== 
+==807== HEAP SUMMARY:
+==807==     in use at exit: 204,000 bytes in 5,202 blocks
+==807==   total heap usage: 10,307 allocs, 5,105 frees, 738,736 bytes allocated
+==807== 
+==807== 40,000 (16,000 direct, 24,000 indirect) bytes in 20 blocks are definitely lost in loss record 6 of 10
+==807==    at 0x4C28730: malloc (in /usr/lib/valgrind/vgpreload_memcheck-amd64-linux.so)
+==807==    by 0x400C22: makeDominatedBit (wfg.c:121)
+==807==    by 0x4018BB: exclhv (wfg.c:295)
+==807==    by 0x401962: hv (wfg.c:319)
+==807==    by 0x401B7B: compute_hypervolume (wfg.c:420)
+==807==    by 0x4021BC: main (wfgmain.c:137)
+==807== 
+==807== 40,000 (16,000 direct, 24,000 indirect) bytes in 20 blocks are definitely lost in loss record 7 of 10
+==807==    at 0x4C28730: malloc (in /usr/lib/valgrind/vgpreload_memcheck-amd64-linux.so)
+==807==    by 0x400C22: makeDominatedBit (wfg.c:121)
+==807==    by 0x4018BB: exclhv (wfg.c:295)
+==807==    by 0x401962: hv (wfg.c:319)
+==807==    by 0x4018E8: exclhv (wfg.c:296)
+==807==    by 0x401962: hv (wfg.c:319)
+==807==    by 0x401B7B: compute_hypervolume (wfg.c:420)
+==807==    by 0x4021BC: main (wfgmain.c:137)
+==807== 
+==807== 40,000 (16,000 direct, 24,000 indirect) bytes in 20 blocks are definitely lost in loss record 8 of 10
+==807==    at 0x4C28730: malloc (in /usr/lib/valgrind/vgpreload_memcheck-amd64-linux.so)
+==807==    by 0x400C22: makeDominatedBit (wfg.c:121)
+==807==    by 0x4018BB: exclhv (wfg.c:295)
+==807==    by 0x401962: hv (wfg.c:319)
+==807==    by 0x4018E8: exclhv (wfg.c:296)
+==807==    by 0x401962: hv (wfg.c:319)
+==807==    by 0x4018E8: exclhv (wfg.c:296)
+==807==    by 0x401962: hv (wfg.c:319)
+==807==    by 0x401B7B: compute_hypervolume (wfg.c:420)
+==807==    by 0x4021BC: main (wfgmain.c:137)
+==807== 
+==807== 40,000 (16,000 direct, 24,000 indirect) bytes in 20 blocks are definitely lost in loss record 9 of 10
+==807==    at 0x4C28730: malloc (in /usr/lib/valgrind/vgpreload_memcheck-amd64-linux.so)
+==807==    by 0x400C22: makeDominatedBit (wfg.c:121)
+==807==    by 0x4018BB: exclhv (wfg.c:295)
+==807==    by 0x401962: hv (wfg.c:319)
+==807==    by 0x4018E8: exclhv (wfg.c:296)
+==807==    by 0x401962: hv (wfg.c:319)
+==807==    by 0x4018E8: exclhv (wfg.c:296)
+==807==    by 0x401962: hv (wfg.c:319)
+==807==    by 0x4018E8: exclhv (wfg.c:296)
+==807==    by 0x401962: hv (wfg.c:319)
+==807==    by 0x401B7B: compute_hypervolume (wfg.c:420)
+==807==    by 0x4021BC: main (wfgmain.c:137)
+==807== 
+==807== 44,000 (17,600 direct, 26,400 indirect) bytes in 22 blocks are definitely lost in loss record 10 of 10
+==807==    at 0x4C28730: malloc (in /usr/lib/valgrind/vgpreload_memcheck-amd64-linux.so)
+==807==    by 0x400C22: makeDominatedBit (wfg.c:121)
+==807==    by 0x4018BB: exclhv (wfg.c:295)
+==807==    by 0x401962: hv (wfg.c:319)
+==807==    by 0x4018E8: exclhv (wfg.c:296)
+==807==    by 0x401962: hv (wfg.c:319)
+==807==    by 0x4018E8: exclhv (wfg.c:296)
+==807==    by 0x401962: hv (wfg.c:319)
+==807==    by 0x4018E8: exclhv (wfg.c:296)
+==807==    by 0x401962: hv (wfg.c:319)
+==807==    by 0x4018E8: exclhv (wfg.c:296)
+==807==    by 0x401962: hv (wfg.c:319)
+==807== 
+==807== LEAK SUMMARY:
+==807==    definitely lost: 81,600 bytes in 102 blocks
+==807==    indirectly lost: 122,400 bytes in 5,100 blocks
+==807==      possibly lost: 0 bytes in 0 blocks
+==807==    still reachable: 0 bytes in 0 blocks
+==807==         suppressed: 0 bytes in 0 blocks
+==807== 
+==807== For counts of detected and suppressed errors, rerun with: -v
+==807== ERROR SUMMARY: 5 errors from 5 contexts (suppressed: 1 from 1)
