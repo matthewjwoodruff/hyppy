@@ -1,190 +1,87 @@
-Let's take a systematic approach, and start by focusing on the only
-really important version --- wfg2.
+Having fixed the memory leak in wfg2, I can get a realistic comparison
+with the old wfg2.
 
-For ease of comprehension, can we make the preprocessor go through a
-file and process just the #if statements?  Not as far as I can tell :)
-I'm not going to spend all morning trying to make cpp do something it
-was definitely not intended for.
+From several runs, here are timings for random/13d/ran.95pts.13d.20:
 
-All right, so let's look at every alloc and every free.  I've pasted
-them below, but the first point I want to make is, wow, that's a lot
-of allocs.  However, as you look at them, the actual allocs are fewer.
+new:
 
-Now, let's focus on wfg.c in particular.
+hv(1) = 79457954259.3537597656
+Time: 3.066666 (s)
+hv(2) = 113223068180.6866912842
+Time: 5.746666 (s)
+hv(3) = 623880974688.9278564453
+Time: 1.306667 (s)
+hv(4) = 97713448855.6325836182
+Time: 16.579998 (s)
+hv(5) = 103277556272.6793060303
+Time: 9.896666 (s)
 
-Line 121:
-What      : Points
-How many  : maxm, the size of the biggest front we're going to have to
-            deal with
-Opt level : 0 only
-Notes     : This is where, as we get deeper in recursion, we allocate
-            a new front if we need it.  That's the opt=0 strategy,
-            which is obviously silly.  I don't know if it's
-            mathematically impossible not to recurse all the way down,
-            but it certainly seems unlikely and it adds significant
-            additional complication.
+old:
 
-Line 124:
-What      : objectives
-How many  : nobj --- the number of objectives for the biggest front in
-            the input file
-Opt level : 0 only
-Notes     : For each point in the front, allocate the objectives.
-            This goes right along with 121 which allocates the points
-            themselves.
+hv(1) = 79457954259.3537597656
+Time: 3.053333 (s)
+hv(2) = 113223068180.6866912842
+Time: 5.733333 (s)
+hv(3) = 623880974688.9278564453
+Time: 1.303333 (s)
+hv(4) = 97713448855.6325836182
+Time: 16.519999 (s)
+hv(5) = 103277556272.6793060303
+Time: 9.889999 (s)
+hv(6) = 50595619461.6716079712
+Time: 14.646665 (s)
+hv(7) = 75932932211.9442901611
+Time: 10.669999 (s)
+hv(8) = 46496151618.2195816040
+Time: 34.946663 (s)
+hv(9) = 70197029961.7542114258
+Time: 13.879998 (s)
+hv(10) = 77653999620.1856079102
+Time: 13.123332 (s)
+hv(11) = 63317332120.9426956177
+Time: 9.746666 (s)
+hv(12) = 290243235887.0772705078
+Time: 2.876667 (s)
 
-Line 365:
-What      : Frontstack, i.e. space to hold all of the front structures
-How many  : One, enough to hold maxm (i.e. max number of points in any
-            front in the file.)
-Opt level : 0 only
-Notes     : The number of fronts to be allocated for other opt levels
-            is similar, but there are some (questionable?) space
-            optimizations.
+0.013333000000000261 s
+0.013333000000000261 s
+0.003333999999999948 s
+0.059999000000001246 s
+0.0066670000000002005 s
 
-Line 371:
-What      : Frontstack again.
-How many  : One, but now just enough to hold nobj - (opt / 2 + 1)
-            fronts.
-Opt level : 1, 2 and 3
-Notes     : Let's unpack that.  Now, instead of recursing as many
-            times as you have points, you recurse as many times as you
-            have *objectives*, minus one.  At least for opt=1 or 2.  For
-            opt=3, you recurse as many times as you have objectives,
-            minus *two*.  One versus two must have something to do
-            with the number of objectives handled by the special case
-            algorithms, like the AVL-tree one that handles 3D.
-Lifetime  : Allocated when we call allocate_fronts in
-            compute_hypervolume.  Freed at the end of
-            compute_hypervolume.
+The differences for the first 5 are pretty consistent.  The new
+implementation with memory leaks fixed takes about a hundredth of a
+second longer, usually.  Interestingly, multiple runs of the 3obj set
+turn up the same number repeatedly: 0.01333 extra seconds.  So it
+seems that there's something not size dependent going on here.  I'm
+not going to inspect it to death, but my guess is that there's a fixed
+time overhead to all that memory allocation.  Now, I suspect that in
+the long term, my Python approach will be a win.
+1) Mostly-fixed memory leaks mean that we don't risk exhausting memory
+with really big files / long runs.
+2) Streaming approach means we don't have to hold big files in memory,
+ever.
+3) Streaming approach means we don't have to invoke wfg2 multiple
+times when Python is directed to process multiple files.  This is
+maybe the biggest win?
+4) I can save a *lot* of arithmetic if I get rid of the reference
+point by translating the whole set so that the reference point is at
+zero.
+5) By focusing on wfg2, which seems to be the best one, I can make a
+really clean implementation.  Or I could at least focus down on 1 and
+2, which I think are the same except that wfg1 doesn't call hv2.
+There's definitely a performance difference there, so wfg2 is probably
+worth the complexity.  Also, wfg0 is way slow by comparison, and wfg3
+is still broken for some reason.
 
-Line 377:
-What      : Allocate points for each front
-How many  : maxm + 2*(opt/3)
-Opt level : 1,2,3
-Notes     : How many is that really?  As many as there are points in
-            the biggest set, plus 2 if opt=3.  This whole integer
-            division business is far too cute for its own good.  Is
-            that really saving us a significant amount of time
-            compared to a conditional?  In fact, I can answer that
-            definitively, no, because opt is being used in #if
-            statements all over the place, so it's actually more
-            expensive than abusing the preprocessor like the source
-            does everywhere else.
-
-Line 380:
-What      : Allocate an avl node
-How many  : One for every point in every front
-Opt level : 1,2,3
-Notes     : AVL is clearly only being used if opt=3.  Why are we
-            allocating space for AVL nodes that's not getting used on
-            levels 1 and 2?  Just because it's easier and presumably
-            doesn't carry much overhead?  If we're doing that though,
-            surely we could spare the extra cycles for a conditional
-            instead of doing cute integer division tricks.  Even if
-            the conditional were, gasp, actually compiled.
-
-Line 382:
-What      : The objective values for a point
-How many  : For every point in every front, allocate a decreasing
-            number of objectives.  What?  I think I may have missed a
-            crucial point here.  nobj - (i+1)*opt/2
-Opt level : 1, 2, or 3
-Notes     : So opt=2 or 3 saves you i+1 points because of slicing.
-            But what is this thing that's happening, where we not only
-            need only as much depth as objectives, but we drop an
-            objective every time we recurse?  
-            Also, this is what valgrind flags as *definitely lost*.
-            So, this is, at least for opt=2, the one and only
-            remaining leak.
-            So what's going on?  We never as far as I can tell
-            overwrite objectives, other than individually overwriting
-            the values.  Nor are we losing points, because Valgrind
-            says we don't leak them.  I'd fire up GDB, but I'm still
-            not sure where to start.
-            Let's look at the lifetime of a single point.  Does
-            objectives change after malloc?  (I.e. so that we lose the
-            pointer?)
-            Yes.  It's pretty clear that this has happened.  And it's
-            not that we did an innocent swap, either.  The address has
-            been actually overwritten, somewhere, somehow.  I know
-            this because I threw in a check to see if we were ever
-            freeing it in cleanup_point.
-            
-            And Valgrind doesn't complain about a bad access, so the
-            new pointer represents a valid memory address, or it's
-            being overwritten after the last access.
-
-            What if this has to do with the new structure I'm trying
-            to make, where we allocate and clean up the whole
-            frontstack with every call?
-
-            We can test that easily --- try running on a single front.
-            Nope.  Same issue.  Actually this is good, since it
-            reduces the space of possible causes.  A single call to
-            compute_hypervolume is enough to trigger the problem.
-
-            AHA!  It's in make dominated bit.  Somewhere.
-Line 405:
-What      : AVL tree structure
-How many  : One
-Opt level : 1, 2, or 3
-Notes     : Should be 3 only.  We don't use AVL at all otherwise.
-
-Line 410:
-What      : Call to alloc_fronts
-How many  : One
-Opt level : All
-Notes     : See 365-382
-
-Allocs:
-
-avl.c:
-190:	return avl_init_tree(malloc(sizeof(avl_tree_t)), cmp, freeitem);
-325:	newnode = avl_init_node(malloc(sizeof(avl_node_t)), item);
-
-wfg.c:
-121:     fs[fr].points = malloc(sizeof(POINT) * maxm);
-124:       fs[fr].points[j].objectives = malloc(sizeof(OBJECTIVE) * nobj);
-365:    frontstack = malloc(sizeof(FRONT) * len_fs);
-371:    frontstack = malloc(sizeof(FRONT) * len_fs);
-377:      {frontstack[i].points = malloc(sizeof(POINT) * maxp); 
-380:         frontstack[i].points[j].tnode = malloc(sizeof(avl_node_t));
-382:         frontstack[i].points[j].objectives = malloc(sizeof(OBJECTIVE) * (nobj - (i + 1) * (opt / 2)));
-405:  tree = avl_alloc_tree ((avl_compare_t) compare_tree_asc,
-410:  fs = allocate_fronts();
-
-wfgmain.c:
-45:  FILECONTENTS *fc = malloc(sizeof(FILECONTENTS));
-63:      fc->fronts = realloc(fc->fronts, sizeof(FRONT) * fc->nFronts);
-72:      f->points = realloc(f->points, sizeof(POINT) * f->nPoints);
-75:      f->points[point].tnode = malloc(sizeof(avl_node_t));
-82:        p->objectives = realloc(p->objectives, sizeof(OBJECTIVE) * f->n);
-109:  given_refpoint.objectives = malloc(sizeof(OBJECTIVE) * refobj);
-110:  given_refpoint.tnode = malloc(sizeof(avl_node_t));
-124:    zero_refpoint.objectives = malloc(sizeof(OBJECTIVE) * currentfront->n);
-125:    zero_refpoint.tnode = malloc(sizeof(avl_node_t));
-
-Frees
-
-avl.c:
-206:			freeitem(node->item);
-207:		free(node);
-220:	avl_free_nodes(avltree);
-221:	free(avltree);
-329:		free(newnode);
-400:		if(avltree->freeitem)
-401:			avltree->freeitem(item);
-402:		free(avlnode);
-
-wfg.c:
-335:  free(point->tnode);
-336:  free(point->objectives);
-345:  free(front->points);
-353:  free(filecontents->fronts);
-406:                         (avl_freeitem_t) free);
-419:  avl_free_tree(tree);
-425:  free(fs);
-
-wfgmain.c:
-148:  free(f);
+Now, I have, but I haven't, actually fixed the memory leak.  The cause
+is decrementing nPoints so that when we try to clean up, we clean up
+the wrong number.  This wasn't a problem for the old implementation,
+because failing to free the memory wasn't much of a problem if you
+were reading in reasonable sized files, allocating memory one time,
+and then terminating.  I didn't have the stamina to do a real fix.
+Instead all I did was have the front keep track of the original points
+that were allocated to it as well as how many there were, so that I
+could actually clean each one up.  And that's good enough for now.  I
+really don't want to have to replicate the allocation logic to figure
+out how many points to clean up.
