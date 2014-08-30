@@ -1,0 +1,29 @@
+What will this look like to C? To Python?
+
+To C, I want to keep it simple.  I'm going to pass a flat array of
+doubles, nobj, and npts.  C is just going to have to assume that we've
+given it something reasonable.
+
+To Python, I also want to keep it simple.  Calling wfg(iterable,
+ref=point, maximize=list) should produce a meaningful hypervolume.
+
+This means that I need to do some wrapping on two levels.  On the C
+side, I need to write the function that takes those three arguments.
+It needs to allocate a front containing the data.  It doesn't have the
+information it needs to validate its inputs, so best of luck!
+
+On the Python side, I need a function that wraps the primitive call
+with the nice interface I want to present to the world.
+
+The way Python handles arrays w.r.t C is that every length of array is
+a new class.  OK, that's an acceptable overhead.
+It looks like this:
+from ctypes import c_double
+Dub = c_double * 10
+dub = Dub()
+dub[4] = 12.1
+anotherdub = Dub(*[1,2,3,4,5,6,7,8,9,10])
+
+So in other words what I'll do is create that flat list in Python, or
+even a generator (if they're splattable, which they are in Py3k.)  And
+at the same time I'll create the type of appropriate size.
