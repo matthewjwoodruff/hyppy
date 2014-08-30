@@ -40,7 +40,7 @@ wfg2debug: wfg.c wfg.h wfgmain.c avl.c
 wfg3debug: wfg.c wfg.h wfgmain.c avl.c
 	$(CC) $(CFLAGS) $(DEBUG)  -Dopt=3 -o wfg3debug wfg.c wfgmain.c avl.c
 
-valgrind: debug
+valgrind: wfg2debug
 	valgrind -v --leak-check=full --show-reachable=yes ./wfg2debug ../random/3d/ran.50pts.3d.20 
 
 %.o: %.c

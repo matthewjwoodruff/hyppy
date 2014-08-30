@@ -4,14 +4,18 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#if opt == 3
 #include "avl.h"
+#endif
 
 typedef double OBJECTIVE;
 
 typedef struct
 {
 	OBJECTIVE *objectives;
+#if opt == 3
       struct avl_node_t * tnode;
+#endif
 } POINT;
 
 typedef struct

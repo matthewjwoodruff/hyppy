@@ -34,7 +34,9 @@
 #include <stdbool.h>
 #include <math.h>
 #include "wfg.h"
+#if opt == 3
 #include "avl.h"
+#endif
 
 #define MAXIMISING true
 
@@ -59,7 +61,9 @@ int maxm = 0;   // size of the biggest front we're going to have to deal with
 int nobj = 0;   // nobj for the biggest front we're going to have to deal with
 
 
+#if opt == 3
 avl_tree_t *tree;
+#endif
 double hv(FRONT);
 
 int compare_tree_asc( const void *p1, const void *p2)
@@ -167,6 +171,7 @@ double hv2(FRONT ps)
   return volume;
 }
 
+#if opt == 3
 double hv3_AVL(FRONT ps)
 /* hv3_AVL: 3D algorithm code taken from version hv-1.2 available at
 http://iridia.ulb.ac.be/~manuel/hypervolume and proposed by:
@@ -274,6 +279,7 @@ Canada, July 2006.
         avl_clear_tree(tree);
         return hyperv;
   }
+#endif
 
 
 double inclhv(POINT p)
@@ -332,7 +338,9 @@ double hv(FRONT ps)
 
 void cleanup_point(POINT* point){
   /* release the memory for a point */
+#if opt == 3
   free(point->tnode);
+#endif
   free(point->objectives);
 
 }
@@ -377,7 +385,9 @@ FRONT* allocate_fronts(){
       {frontstack[i].points = malloc(sizeof(POINT) * maxp); 
        for (int j = 0; j < maxp; j++) 
        {
+#if opt == 3
          frontstack[i].points[j].tnode = malloc(sizeof(avl_node_t));
+#endif
          // slicing (opt > 1) saves one extra objective at each level
          frontstack[i].points[j].objectives = malloc(sizeof(OBJECTIVE) * (nobj - (i + 1) * (opt / 2)));
        }
@@ -402,8 +412,10 @@ double compute_hypervolume(FRONT* front, POINT* referencepoint)
   nobj = front->n;
   ref = *referencepoint;
 
+#if opt == 3
   tree = avl_alloc_tree ((avl_compare_t) compare_tree_asc,
                          (avl_freeitem_t) free);
+#endif
   /* end wrapping of globals */
   maxm = front->nPoints;
 
@@ -416,7 +428,9 @@ double compute_hypervolume(FRONT* front, POINT* referencepoint)
         }
   #endif
   double computed_hypervolume = hv(*front);
+#if opt == 3
   avl_free_tree(tree);
+#endif
   #if opt > 0
   for(int ii = 0; ii<len_fs; ii++){
     cleanup_front(&fs[ii]);

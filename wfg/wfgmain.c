@@ -1,7 +1,9 @@
 #include <sys/time.h>
 #include <sys/resource.h>
 #include "wfg.h"
+#if opt == 3
 #include "avl.h"
+#endif
 
 static void trimLine(char line[])
 {
@@ -72,7 +74,9 @@ FILECONTENTS *readFile(char filename[])
       f->points = realloc(f->points, sizeof(POINT) * f->nPoints);
       f->n = 0;
       f->points[point].objectives = NULL;
+#if opt == 3
       f->points[point].tnode = malloc(sizeof(avl_node_t));
+#endif
       char *tok = strtok(line, " \t\n");
       do
       {
@@ -107,7 +111,9 @@ int main(int argc, char *argv[])
   int refobj = argc - 2;
   POINT given_refpoint;
   given_refpoint.objectives = malloc(sizeof(OBJECTIVE) * refobj);
+#if opt == 3
   given_refpoint.tnode = malloc(sizeof(avl_node_t));
+#endif
   for (int i = 0; i < refobj; i++) {
     given_refpoint.objectives[i] = atof(given_reference[i]);
   }
@@ -122,7 +128,9 @@ int main(int argc, char *argv[])
     POINT* ref;
     POINT zero_refpoint;
     zero_refpoint.objectives = malloc(sizeof(OBJECTIVE) * currentfront->n);
+#if opt == 3
     zero_refpoint.tnode = malloc(sizeof(avl_node_t));
+#endif
 
     for (int i = 0; i < currentfront->n; i++) {
       zero_refpoint.objectives[i] = 0.0;
