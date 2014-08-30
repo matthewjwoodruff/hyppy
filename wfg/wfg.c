@@ -122,7 +122,6 @@ void makeDominatedBit(FRONT ps, int p)
 // creates the front ps[p+1 ..] in fs[fr], with each point bounded by ps[p] and dominated points removed 
 {
   // when opt = 0 each new frame is allocated as needed, because the worst-case needs #frames = #points 
-  //printf("make dominated bit %lX\n", (unsigned long)*suspect_address_holder);
   #if opt == 0
   if (fr > frmax)
     {frmax = fr;
@@ -134,7 +133,6 @@ void makeDominatedBit(FRONT ps, int p)
        fs[fr].points[j].objectives = malloc(sizeof(OBJECTIVE) * nobj);
      }
     }
-  //printf("make dominated bit (opt==0) %lX\n", (unsigned long)*suspect_address_holder);
   #endif
 
   int z = ps.nPoints - 1 - p;
@@ -147,7 +145,6 @@ void makeDominatedBit(FRONT ps, int p)
     {int j = 0;
      bool keep = true;
      while (j < fs[fr].nPoints && keep){
-       //printf("while loop, j=%d: %lX\n", j, (unsigned long)*suspect_address_holder);
 
        switch (dominates2way(fs[fr].points[i], fs[fr].points[j]))
    {case -1: t = fs[fr].points[j];
@@ -160,20 +157,13 @@ void makeDominatedBit(FRONT ps, int p)
     default: keep = false;
    }}
      if (keep) {
-     //printf("keep is true %lX\n", (unsigned long)*suspect_address_holder);
 	        t = fs[fr].points[fs[fr].nPoints]; 
-     //printf("fs[%d].points[%d].objectives %lX\n", fr, fs[fr].nPoints, (unsigned long) fs[fr].points[fs[fr].nPoints].objectives); 
-     //printf("fs[%d].points[%d].objectives %lX\n", fr, i, (unsigned long) fs[fr].points[i].objectives);
                 fs[fr].points[fs[fr].nPoints] = fs[fr].points[i]; 
                 fs[fr].points[i] = t; 
                 fs[fr].nPoints++;
-     //printf("after swap fs[%d].points[%d].objectives %lX\n", fr, fs[fr].nPoints, (unsigned long) fs[fr].points[fs[fr].nPoints].objectives); 
-     //printf("after swap fs[%d].points[%d].objectives %lX\n", fr, i, (unsigned long) fs[fr].points[i].objectives);
      }
-     //printf("make dominated bit (end for loop) %lX\n", (unsigned long)*suspect_address_holder);
     }
   fr++;
-  //printf("make dominated bit (end) %lX\n", (unsigned long)*suspect_address_holder);
 }
 
 
@@ -359,12 +349,6 @@ void cleanup_point(POINT* point){
 #if opt == 3
   free(point->tnode);
 #endif
-  static int oneshot=1;
-  if(oneshot){
-	//printf("cleanup: objectives %lX\n", (unsigned long)fs[0].points[0].objectives);
-	oneshot=0;}
-  if(point->objectives == suspect_address){
-	  printf("cleanup revisited %lX\n", (unsigned long)suspect_address);}
   free(point->objectives);
 
 }
@@ -417,12 +401,6 @@ FRONT* allocate_fronts(){
          // slicing (opt > 1) saves one extra objective at each level
          frontstack[i].points[j].objectives = malloc(sizeof(OBJECTIVE) * (nobj - (i + 1) * (opt / 2)));
       }
-   static int oneshot=1;
-   if(oneshot){
-	printf("allocate_fronts objectives %lX\n", (unsigned long)frontstack[0].points[0].objectives);
-	suspect_address = frontstack[0].points[0].objectives;
-	suspect_address_holder = &frontstack[0].points[0].objectives;
-	oneshot=0;}
   }
   #endif
   return frontstack;
@@ -452,10 +430,6 @@ double compute_hypervolume(FRONT* front, POINT* referencepoint)
   maxm = front->nPoints;
 
   fs = allocate_fronts();
-   static int oneshot=1;
-   if(oneshot){
-	printf("compute_hypervolume objectives %lX\n", (unsigned long)fs[0].points[0].objectives);
-	oneshot=0;}
 
   #if opt >= 3
   if (nobj == 2){
@@ -469,8 +443,6 @@ double compute_hypervolume(FRONT* front, POINT* referencepoint)
 #endif
   #if opt > 0
   for(int ii = 0; ii<len_fs; ii++){
-    printf("cleaning up front %d of %d\n", ii, len_fs);
-    fflush(stdout);
     cleanup_front(&fs[ii]);
   }
   #endif
