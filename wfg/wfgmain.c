@@ -86,6 +86,8 @@ FILECONTENTS *readFile(char filename[])
         p->objectives = realloc(p->objectives, sizeof(OBJECTIVE) * f->n);
         p->objectives[objective] = atof(tok);
       } while ((tok = strtok(NULL, " \t\n")) != NULL);
+      f->allocated_points = f->points;
+      f->n_allocated_points = f->nPoints; 
     }
   }
 

@@ -23,6 +23,8 @@ typedef struct
 	int nPoints;
 	int n;
 	POINT *points;
+	int n_allocated_points;
+	POINT *allocated_points;
 } FRONT;
 
 typedef struct

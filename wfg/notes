@@ -100,8 +100,31 @@ Notes     : So opt=2 or 3 saves you i+1 points because of slicing.
             So what's going on?  We never as far as I can tell
             overwrite objectives, other than individually overwriting
             the values.  Nor are we losing points, because Valgrind
-            says we don't leak them.  I'd 
+            says we don't leak them.  I'd fire up GDB, but I'm still
+            not sure where to start.
+            Let's look at the lifetime of a single point.  Does
+            objectives change after malloc?  (I.e. so that we lose the
+            pointer?)
+            Yes.  It's pretty clear that this has happened.  And it's
+            not that we did an innocent swap, either.  The address has
+            been actually overwritten, somewhere, somehow.  I know
+            this because I threw in a check to see if we were ever
+            freeing it in cleanup_point.
+            
+            And Valgrind doesn't complain about a bad access, so the
+            new pointer represents a valid memory address, or it's
+            being overwritten after the last access.
 
+            What if this has to do with the new structure I'm trying
+            to make, where we allocate and clean up the whole
+            frontstack with every call?
+
+            We can test that easily --- try running on a single front.
+            Nope.  Same issue.  Actually this is good, since it
+            reduces the space of possible causes.  A single call to
+            compute_hypervolume is enough to trigger the problem.
+
+            AHA!  It's in make dominated bit.  Somewhere.
 Line 405:
 What      : AVL tree structure
 How many  : One
