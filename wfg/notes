@@ -1,88 +1,167 @@
-wfg3 segfaults
-In addition wfg3 gives wrong answers :(
-Everything leaks memory now.
-Allocating only one front is a red herring --- has to do with the number of objectives.
+Let's take a systematic approach, and start by focusing on the only
+really important version --- wfg2.
 
-The interesting thing here is that wfg0 allocates as it goes.  Does it only sometimes fail to clean up?
+For ease of comprehension, can we make the preprocessor go through a
+file and process just the #if statements?  Not as far as I can tell :)
+I'm not going to spend all morning trying to make cpp do something it
+was definitely not intended for.
 
-Ah, but look.  The leak for wfg2 is the same sort of thing, the objectives are leaking.
+All right, so let's look at every alloc and every free.  I've pasted
+them below, but the first point I want to make is, wow, that's a lot
+of allocs.  However, as you look at them, the actual allocs are fewer.
 
+Now, let's focus on wfg.c in particular.
 
+Line 121:
+What      : Points
+How many  : maxm, the size of the biggest front we're going to have to
+            deal with
+Opt level : 0 only
+Notes     : This is where, as we get deeper in recursion, we allocate
+            a new front if we need it.  That's the opt=0 strategy,
+            which is obviously silly.  I don't know if it's
+            mathematically impossible not to recurse all the way down,
+            but it certainly seems unlikely and it adds significant
+            additional complication.
 
-==807== Memcheck, a memory error detector
-==807== Copyright (C) 2002-2013, and GNU GPL'd, by Julian Seward et al.
-==807== Using Valgrind-3.9.0 and LibVEX; rerun with -h for copyright info
-==807== Command: ./wfg0debug ran.50pts.3d.20
-==807== 
-==807== 
-==807== HEAP SUMMARY:
-==807==     in use at exit: 204,000 bytes in 5,202 blocks
-==807==   total heap usage: 10,307 allocs, 5,105 frees, 738,736 bytes allocated
-==807== 
-==807== 40,000 (16,000 direct, 24,000 indirect) bytes in 20 blocks are definitely lost in loss record 6 of 10
-==807==    at 0x4C28730: malloc (in /usr/lib/valgrind/vgpreload_memcheck-amd64-linux.so)
-==807==    by 0x400C22: makeDominatedBit (wfg.c:121)
-==807==    by 0x4018BB: exclhv (wfg.c:295)
-==807==    by 0x401962: hv (wfg.c:319)
-==807==    by 0x401B7B: compute_hypervolume (wfg.c:420)
-==807==    by 0x4021BC: main (wfgmain.c:137)
-==807== 
-==807== 40,000 (16,000 direct, 24,000 indirect) bytes in 20 blocks are definitely lost in loss record 7 of 10
-==807==    at 0x4C28730: malloc (in /usr/lib/valgrind/vgpreload_memcheck-amd64-linux.so)
-==807==    by 0x400C22: makeDominatedBit (wfg.c:121)
-==807==    by 0x4018BB: exclhv (wfg.c:295)
-==807==    by 0x401962: hv (wfg.c:319)
-==807==    by 0x4018E8: exclhv (wfg.c:296)
-==807==    by 0x401962: hv (wfg.c:319)
-==807==    by 0x401B7B: compute_hypervolume (wfg.c:420)
-==807==    by 0x4021BC: main (wfgmain.c:137)
-==807== 
-==807== 40,000 (16,000 direct, 24,000 indirect) bytes in 20 blocks are definitely lost in loss record 8 of 10
-==807==    at 0x4C28730: malloc (in /usr/lib/valgrind/vgpreload_memcheck-amd64-linux.so)
-==807==    by 0x400C22: makeDominatedBit (wfg.c:121)
-==807==    by 0x4018BB: exclhv (wfg.c:295)
-==807==    by 0x401962: hv (wfg.c:319)
-==807==    by 0x4018E8: exclhv (wfg.c:296)
-==807==    by 0x401962: hv (wfg.c:319)
-==807==    by 0x4018E8: exclhv (wfg.c:296)
-==807==    by 0x401962: hv (wfg.c:319)
-==807==    by 0x401B7B: compute_hypervolume (wfg.c:420)
-==807==    by 0x4021BC: main (wfgmain.c:137)
-==807== 
-==807== 40,000 (16,000 direct, 24,000 indirect) bytes in 20 blocks are definitely lost in loss record 9 of 10
-==807==    at 0x4C28730: malloc (in /usr/lib/valgrind/vgpreload_memcheck-amd64-linux.so)
-==807==    by 0x400C22: makeDominatedBit (wfg.c:121)
-==807==    by 0x4018BB: exclhv (wfg.c:295)
-==807==    by 0x401962: hv (wfg.c:319)
-==807==    by 0x4018E8: exclhv (wfg.c:296)
-==807==    by 0x401962: hv (wfg.c:319)
-==807==    by 0x4018E8: exclhv (wfg.c:296)
-==807==    by 0x401962: hv (wfg.c:319)
-==807==    by 0x4018E8: exclhv (wfg.c:296)
-==807==    by 0x401962: hv (wfg.c:319)
-==807==    by 0x401B7B: compute_hypervolume (wfg.c:420)
-==807==    by 0x4021BC: main (wfgmain.c:137)
-==807== 
-==807== 44,000 (17,600 direct, 26,400 indirect) bytes in 22 blocks are definitely lost in loss record 10 of 10
-==807==    at 0x4C28730: malloc (in /usr/lib/valgrind/vgpreload_memcheck-amd64-linux.so)
-==807==    by 0x400C22: makeDominatedBit (wfg.c:121)
-==807==    by 0x4018BB: exclhv (wfg.c:295)
-==807==    by 0x401962: hv (wfg.c:319)
-==807==    by 0x4018E8: exclhv (wfg.c:296)
-==807==    by 0x401962: hv (wfg.c:319)
-==807==    by 0x4018E8: exclhv (wfg.c:296)
-==807==    by 0x401962: hv (wfg.c:319)
-==807==    by 0x4018E8: exclhv (wfg.c:296)
-==807==    by 0x401962: hv (wfg.c:319)
-==807==    by 0x4018E8: exclhv (wfg.c:296)
-==807==    by 0x401962: hv (wfg.c:319)
-==807== 
-==807== LEAK SUMMARY:
-==807==    definitely lost: 81,600 bytes in 102 blocks
-==807==    indirectly lost: 122,400 bytes in 5,100 blocks
-==807==      possibly lost: 0 bytes in 0 blocks
-==807==    still reachable: 0 bytes in 0 blocks
-==807==         suppressed: 0 bytes in 0 blocks
-==807== 
-==807== For counts of detected and suppressed errors, rerun with: -v
-==807== ERROR SUMMARY: 5 errors from 5 contexts (suppressed: 1 from 1)
+Line 124:
+What      : objectives
+How many  : nobj --- the number of objectives for the biggest front in
+            the input file
+Opt level : 0 only
+Notes     : For each point in the front, allocate the objectives.
+            This goes right along with 121 which allocates the points
+            themselves.
+
+Line 365:
+What      : Frontstack, i.e. space to hold all of the front structures
+How many  : One, enough to hold maxm (i.e. max number of points in any
+            front in the file.)
+Opt level : 0 only
+Notes     : The number of fronts to be allocated for other opt levels
+            is similar, but there are some (questionable?) space
+            optimizations.
+
+Line 371:
+What      : Frontstack again.
+How many  : One, but now just enough to hold nobj - (opt / 2 + 1)
+            fronts.
+Opt level : 1, 2 and 3
+Notes     : Let's unpack that.  Now, instead of recursing as many
+            times as you have points, you recurse as many times as you
+            have *objectives*, minus one.  At least for opt=1 or 2.  For
+            opt=3, you recurse as many times as you have objectives,
+            minus *two*.  One versus two must have something to do
+            with the number of objectives handled by the special case
+            algorithms, like the AVL-tree one that handles 3D.
+Lifetime  : Allocated when we call allocate_fronts in
+            compute_hypervolume.  Freed at the end of
+            compute_hypervolume.
+
+Line 377:
+What      : Allocate points for each front
+How many  : maxm + 2*(opt/3)
+Opt level : 1,2,3
+Notes     : How many is that really?  As many as there are points in
+            the biggest set, plus 2 if opt=3.  This whole integer
+            division business is far too cute for its own good.  Is
+            that really saving us a significant amount of time
+            compared to a conditional?  In fact, I can answer that
+            definitively, no, because opt is being used in #if
+            statements all over the place, so it's actually more
+            expensive than abusing the preprocessor like the source
+            does everywhere else.
+
+Line 380:
+What      : Allocate an avl node
+How many  : One for every point in every front
+Opt level : 1,2,3
+Notes     : AVL is clearly only being used if opt=3.  Why are we
+            allocating space for AVL nodes that's not getting used on
+            levels 1 and 2?  Just because it's easier and presumably
+            doesn't carry much overhead?  If we're doing that though,
+            surely we could spare the extra cycles for a conditional
+            instead of doing cute integer division tricks.  Even if
+            the conditional were, gasp, actually compiled.
+
+Line 382:
+What      : The objective values for a point
+How many  : For every point in every front, allocate a decreasing
+            number of objectives.  What?  I think I may have missed a
+            crucial point here.  nobj - (i+1)*opt/2
+Opt level : 1, 2, or 3
+Notes     : So opt=2 or 3 saves you i+1 points because of slicing.
+            But what is this thing that's happening, where we not only
+            need only as much depth as objectives, but we drop an
+            objective every time we recurse?  
+            Also, this is what valgrind flags as *definitely lost*.
+            So, this is, at least for opt=2, the one and only
+            remaining leak.
+            So what's going on?  We never as far as I can tell
+            overwrite objectives, other than individually overwriting
+            the values.  Nor are we losing points, because Valgrind
+            says we don't leak them.  I'd 
+
+Line 405:
+What      : AVL tree structure
+How many  : One
+Opt level : 1, 2, or 3
+Notes     : Should be 3 only.  We don't use AVL at all otherwise.
+
+Line 410:
+What      : Call to alloc_fronts
+How many  : One
+Opt level : All
+Notes     : See 365-382
+
+Allocs:
+
+avl.c:
+190:	return avl_init_tree(malloc(sizeof(avl_tree_t)), cmp, freeitem);
+325:	newnode = avl_init_node(malloc(sizeof(avl_node_t)), item);
+
+wfg.c:
+121:     fs[fr].points = malloc(sizeof(POINT) * maxm);
+124:       fs[fr].points[j].objectives = malloc(sizeof(OBJECTIVE) * nobj);
+365:    frontstack = malloc(sizeof(FRONT) * len_fs);
+371:    frontstack = malloc(sizeof(FRONT) * len_fs);
+377:      {frontstack[i].points = malloc(sizeof(POINT) * maxp); 
+380:         frontstack[i].points[j].tnode = malloc(sizeof(avl_node_t));
+382:         frontstack[i].points[j].objectives = malloc(sizeof(OBJECTIVE) * (nobj - (i + 1) * (opt / 2)));
+405:  tree = avl_alloc_tree ((avl_compare_t) compare_tree_asc,
+410:  fs = allocate_fronts();
+
+wfgmain.c:
+45:  FILECONTENTS *fc = malloc(sizeof(FILECONTENTS));
+63:      fc->fronts = realloc(fc->fronts, sizeof(FRONT) * fc->nFronts);
+72:      f->points = realloc(f->points, sizeof(POINT) * f->nPoints);
+75:      f->points[point].tnode = malloc(sizeof(avl_node_t));
+82:        p->objectives = realloc(p->objectives, sizeof(OBJECTIVE) * f->n);
+109:  given_refpoint.objectives = malloc(sizeof(OBJECTIVE) * refobj);
+110:  given_refpoint.tnode = malloc(sizeof(avl_node_t));
+124:    zero_refpoint.objectives = malloc(sizeof(OBJECTIVE) * currentfront->n);
+125:    zero_refpoint.tnode = malloc(sizeof(avl_node_t));
+
+Frees
+
+avl.c:
+206:			freeitem(node->item);
+207:		free(node);
+220:	avl_free_nodes(avltree);
+221:	free(avltree);
+329:		free(newnode);
+400:		if(avltree->freeitem)
+401:			avltree->freeitem(item);
+402:		free(avlnode);
+
+wfg.c:
+335:  free(point->tnode);
+336:  free(point->objectives);
+345:  free(front->points);
+353:  free(filecontents->fronts);
+406:                         (avl_freeitem_t) free);
+419:  avl_free_tree(tree);
+425:  free(fs);
+
+wfgmain.c:
+148:  free(f);
