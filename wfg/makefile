@@ -26,8 +26,8 @@ $(EXE): $(OBJ) wfg.c wfg.h wfgmain.c architecture
 architecture:
 	$(if $(march), , $(march_error))
 
-wfg2.so: wfg.c wfg.h
-	$(CC) $(CFLAGS) -Dopt=2 -fPIC -shared wfg.c -o wfg2.so
+libwfg2.so: wfg.c wfg.h
+	$(CC) $(CFLAGS) -Dopt=2 -fPIC -shared wfg.c -o libwfg2.so
 
 debug: wfg0debug wfg1debug wfg2debug wfg3debug
 
