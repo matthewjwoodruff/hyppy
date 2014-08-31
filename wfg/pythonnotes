@@ -31,3 +31,25 @@ at the same time I'll create the type of appropriate size.
 Actually, we're also going to take care of translating to zero on the
 Python side.  Might be able to get the reference point code out of wfg
 entirely.
+
+# Scaling: A big huge issue we ignored?
+
+Scaling might not actually be worse for hypervolume than for additive
+metrics.  Multiplying everything together over a common denominator
+means that scale doesn't really matter all that much --- each scaling
+factor could just as well come from any objective.
+
+Now, there's still a possible role to be played by epsilons.  First of
+all, there's the sorting, and second, there's the possibility of using
+a (perhaps?) much faster integer version.  Because epsilons say, we're
+only interested in box occupancy, why not use box number relative to
+the reference point's box number rather than the real number distance
+to the reference point.  This will speed things up internally even if
+we still use floats, because the nondom sort will be much more likely
+to cull points.  (Assuming conversion from int to float is
+deterministic, i.e. same int always has same float representation
+resulting from a cast.  No need for math or roundtrip to be
+consistent, so no error accumulation.)  And if we also have an integer
+version, that *may* be even faster because we get to leave out the
+FPU.  Assuming we change double to OBJECTIVE everywhere it makes sense
+to do so.
