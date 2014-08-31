@@ -170,7 +170,7 @@ def get_args(argv):
         help='use tabs as delimiters')
 
     # separating and identifying sets
-    parser.add_argument('-s', '--separator', type=str, default='#',
+    parser.add_argument('-s', '--separator', type=str,
         help='String which, if found at the beginning of a line, '\
              'causes that line to be treated as a separator between '\
              'solution sets.  To ignore separators instead, treat '\
@@ -219,8 +219,8 @@ def get_args(argv):
     # Stuff at the top of the file
     parser.add_argument('--skip-initial-lines', type=int, default=0,
         help='Number of lines to skip at the beginning of the file.')
-    parser.add_argument('--header-line', type=int, default=-1,
-        help='Input line (counting from 0) on which to find header '\
+    parser.add_argument('--header-line', type=int,
+        help='Input line (counting from 1) on which to find header '\
              'information for the points in the solution sets. '\
              'Implies --skip-initial-lines up to the one on which '\
              'the header is found.  Compatible with a range for '\
@@ -378,29 +378,43 @@ def _regex_lines_from_files(files, **kwargs):
     comment = kwargs.get('comment_regex', None)
     header = kwargs.get('header_regex', None)
     sep_offset = 0
+    sep = 0
     name = None
-    override_header = None
 
     for line, number, about in noregex:
-        if about.name != name: # next file
-            name = about.name
+        if about['name'] != name: # next file
+            name = about['name']
             sep_offset = 0
-            override_header = None
+            sep = about['sep']
+            new_header = about['header']
+            new_about = {'sep': sep + sep_offset,
+                         'name': name,
+                         'header': new_header}
+
+        if about['sep'] != sep:
+            sep = about['sep']
+            new_about = {'sep': sep + sep_offset,
+                         'name': name,
+                         'header': new_header}
+
         if comment is not None:
             if comment.search(line) is not None:
                 continue # skip comment line
         if separator is not None:
             if separator.search(line) is not None:
                 sep_offset += 1
+                new_about = {'sep': sep + sep_offset,
+                             'name': name,
+                             'header': new_header}
         if header is not None:
             if header.search(line) is not None:
-                override_header = line
                 sep_offset += 1
+                new_header = line
+                new_about = {'sep': sep + sep_offset,
+                             'name': name,
+                             'header': new_header}
                 continue
-        about['sep'] = about['sep'] + sep_offset
-        if override_header is not None:
-            about['header'] = override_header
-        yield (line, number, about)
+        yield (line, number, new_about)
 
 def lines_from_files(files, **kwargs):
     """
