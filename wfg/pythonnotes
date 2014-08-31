@@ -27,3 +27,7 @@ anotherdub = Dub(*[1,2,3,4,5,6,7,8,9,10])
 So in other words what I'll do is create that flat list in Python, or
 even a generator (if they're splattable, which they are in Py3k.)  And
 at the same time I'll create the type of appropriate size.
+
+Actually, we're also going to take care of translating to zero on the
+Python side.  Might be able to get the reference point code out of wfg
+entirely.

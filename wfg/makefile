@@ -29,6 +29,12 @@ architecture:
 libwfg2.so: wfg.c wfg.h
 	$(CC) $(CFLAGS) -Dopt=2 -fPIC -shared wfg.c -o libwfg2.so
 
+libwfg2_debug.so: wfg.c wfg.h
+	$(CC) $(CFLAGS) $(DEBUG) -Dopt=2 -fPIC -shared -o libwfg2_debug.so wfg.c 
+
+pythontest: libwfg2_debug.so test.py
+	python2 test.py
+
 debug: wfg0debug wfg1debug wfg2debug wfg3debug
 
 wfg0debug: wfg.c wfg.h wfgmain.c avl.c

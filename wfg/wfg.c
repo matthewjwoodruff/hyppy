@@ -449,3 +449,35 @@ double compute_hypervolume(FRONT* front, POINT* referencepoint)
   free(fs);
   return computed_hypervolume;
 }
+
+double hypervolume(int number_of_objectives, int number_of_points, double* values){
+    FRONT front;
+    // allocate points for the front
+    front.points = malloc(sizeof(POINT) * number_of_points);
+    front.allocated_points = front.points;
+    front.nPoints = number_of_points;
+    front.n_allocated_points = number_of_points;
+    front.n = number_of_objectives;
+
+    // allocate objectives for each point
+    for(int ii=0; ii<number_of_points; ii++){
+        front.points[ii].objectives = malloc(sizeof(OBJECTIVE) * number_of_objectives);
+    }
+
+    // assign incoming values to objectives
+    int valueindex=0;
+    for(int ipoint=0; ipoint<number_of_points; ipoint++){
+        for(int iobj=0; iobj<number_of_objectives; iobj++){
+            valueindex = ipoint*number_of_objectives+iobj;
+            front.points[ipoint].objectives[iobj] = values[valueindex];
+        }
+    }
+
+    POINT zero_refpoint;
+    zero_refpoint.objectives = malloc(sizeof(OBJECTIVE) * number_of_objectives);
+
+    double computed_hv = compute_hypervolume(&front, &zero_refpoint);
+    cleanup_front(&front);
+    cleanup_point(&zero_refpoint);
+    return computed_hv;
+}
