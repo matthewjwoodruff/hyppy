@@ -884,10 +884,12 @@ def hypervolume(rows, **kwargs):
                     row[i] = val / reference[i]
             reference = [1.0] * len(reference)
 
-    # transform to reference point
+    # transform to reference point, clamping
     if reference is not None:
         for row in objective_rows:
             for i, val in enumerate(row):
+                if val > reference[i]: #clamp!
+                    val = reference[i]
                 row[i] = reference[i] - val
 
     # finally!  compute hypervolume
@@ -1020,21 +1022,10 @@ def cli(args):
     cfr = convert_objectives_from_rowsets(rfr, **kwargs)
     # pipeline stage 4: compute hypervolume
     hfc = hypervolumes_from_converted_sets(cfr, **kwargs)
-    for hv, grouping in hfc:
-        print(hv)
-
-
-    # -break- everything from here on should be in a separate
-    # method because it could be invoked programmatically
-    #
-    # pipeline stage 3: preliminary data processing
-    #                   * flip maximization columns
-    #                   * get down to just objectives, drop row annotations, and reorder if applicable
-    #                   * translate relative to ref point
-    #                   * eps sort
-    #                   * integer
-    # pipeline stage 4: emit hypervolumes
     # pipeline stage 5: write outputs
+    for hv, grouping in hfc:
+        args.output.write("{0} {1}".format(grouping, hv))
+        args.output.write('\n')
 
 if __name__ == '__main__':
     cli(get_args(sys.argv))
