@@ -858,7 +858,7 @@ def hypervolume(rows, **kwargs):
     # See http://stackoverflow.com/questions/3387655/safest-way-to-convert-float-to-integer-in-python
     if kwargs.get('integer', False) is True and epsilons is not None:
         if reference is not None:
-            for i, val in reference:
+            for i, val in enumerate(reference):
                 reference[i] = math.floor(val / epsilons[i])
         for row in objective_rows:
             for i, val in enumerate(row):
@@ -871,7 +871,7 @@ def hypervolume(rows, **kwargs):
             if integer is False: # if true, scale is already applied
                 # scale reference point
                 if reference is not None:
-                    for i, val in reference:
+                    for i, val in enumerate(reference):
                         reference[i] = val / epsilons[i]
                 for row in objective_rows:
                     for i, val in enumerate(row):
@@ -1021,10 +1021,12 @@ def cli(args):
     rfr = rowsets_from_rows(rfl, **kwargs)
     # pipeline stage 3: extract objectives from rows
     cfr = convert_objectives_from_rowsets(rfr, **kwargs)
+
     # pipeline stage 4: compute hypervolume
     hfc = hypervolumes_from_converted_sets(cfr, **kwargs)
     # pipeline stage 5: write outputs
     grouping_bits = []
+    header = []
     if kwargs.get('no_separate_files', False) is False:
         grouping_bits.append('name')
         header.append('input')
@@ -1037,17 +1039,23 @@ def cli(args):
     elif kwargs.get('index_columns', None) is not None:
         grouping_bits.append('index')
         header.extend(["i{0}".format(x) for x in range(len(kwargs.get('index_columns')))])
-    if kwargs.get('auto_reference') is 'full':
+    if kwargs.get('reference') is not None:
         grouping_bits.append('reference')
         header.append('reference')
-    args.output.write(header)
+    elif kwargs.get('auto_reference') is 'full':
+        grouping_bits.append('reference')
+        header.append('reference')
+    header.append('hv')
+    delimiter = args.delimiter
+    args.output.write(delimiter.join(header))
     args.output.write('\n')
 
     for hv, grouping in hfc:
-        args.output.write(args.delimiter.join(
-            [str(grouping[bit]) for bit in grouping_bits])
+        the_hypervolume=hv # why does this prevent a weird bug?
+        args.output.write(delimiter.join(
+            [str(grouping[bit]) for bit in grouping_bits]))
         args.output.write(delimiter)
-        args.output.write(str(hv))
+        args.output.write("{0:.5g}".format(the_hypervolume))
         args.output.write('\n')
 
 if __name__ == '__main__':
