@@ -885,6 +885,7 @@ def hypervolume(rows, **kwargs):
             reference = [1.0] * len(reference)
 
     # transform to reference point, clamping
+    # wfg assumes maximization, so this assures nonnegative values
     if reference is not None:
         for row in objective_rows:
             for i, val in enumerate(row):
@@ -1023,8 +1024,30 @@ def cli(args):
     # pipeline stage 4: compute hypervolume
     hfc = hypervolumes_from_converted_sets(cfr, **kwargs)
     # pipeline stage 5: write outputs
+    grouping_bits = []
+    if kwargs.get('no_separate_files', False) is False:
+        grouping_bits.append('name')
+        header.append('input')
+    if kwargs.get('no_order', False) is False:
+        grouping_bits.append('sep')
+        header.append('front number')
+    if kwargs.get('index_column_names', None) is not None:
+        grouping_bits.append('index')
+        header.extend(kwargs['index_column_names'])
+    elif kwargs.get('index_columns', None) is not None:
+        grouping_bits.append('index')
+        header.extend(["i{0}".format(x) for x in range(len(kwargs.get('index_columns')))])
+    if kwargs.get('auto_reference') is 'full':
+        grouping_bits.append('reference')
+        header.append('reference')
+    args.output.write(header)
+    args.output.write('\n')
+
     for hv, grouping in hfc:
-        args.output.write("{0} {1}".format(grouping, hv))
+        args.output.write(args.delimiter.join(
+            [str(grouping[bit]) for bit in grouping_bits])
+        args.output.write(delimiter)
+        args.output.write(str(hv))
         args.output.write('\n')
 
 if __name__ == '__main__':
