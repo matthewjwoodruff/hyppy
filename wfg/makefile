@@ -26,8 +26,8 @@ $(EXE): $(OBJ) wfg.c wfg.h wfgmain.c architecture
 architecture:
 	$(if $(march), , $(march_error))
 
-libwfg2.so: wfg.c wfg.h
-	$(CC) $(CFLAGS) -Dopt=2 -fPIC -shared wfg.c -o libwfg2.so
+libwfg2.so: wfg.c wfg.h architecture
+	$(CC) $(CFLAGS) $(OPT) -Dopt=2 -fPIC -shared wfg.c -o libwfg2.so
 
 libwfg2_debug.so: wfg.c wfg.h
 	$(CC) $(CFLAGS) $(DEBUG) -Dopt=2 -fPIC -shared -o libwfg2_debug.so wfg.c 
@@ -55,6 +55,7 @@ valgrind: wfg2debug
 clean: 
 	rm -f wfg[0-4] exc[0-4] *.o 
 	rm -rf *.dSYM
+	rm -f libwfg*
 
 VERSION=$(shell git tag)
 
