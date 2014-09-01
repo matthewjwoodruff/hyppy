@@ -22,6 +22,8 @@ import ctypes
 import sys
 import math
 
+class InputError(Exception): pass
+
 def rerange(intranges):
     """ 
     Convert a set of intranges into a list of integers.
@@ -105,6 +107,8 @@ def get_args(argv):
     # choosing columns
     parser.add_argument('-o', '--objectives', type=intrange, nargs='+',
         help='objective columns (zero-indexed), default is all')
+    parser.add_argument('--objective-column-names', type=str, nargs='+',
+        help='Names of objective columns')
     parser.add_argument('-m', '--maximize', type=intrange, nargs='+',
         help='Objective columns to maximize, default is none. '\
              'Maximized objectives are multiplied by -1.0 and '\
@@ -114,6 +118,8 @@ def get_args(argv):
              'odd number of maximization objectives.')
     parser.add_argument('-M', '--maximize-all', action='store_true',
         help='maximize all objectives')
+    parser.add_argument('--maximize-column-names', type=str, nargs='+',
+        help='Names of columns to maximize.')
     parser.add_argument("--reverse-column-indices", action='store_true',
         default=False, help='Reverse the order of column '\
         'indices.  May be useful if your objectives are '\
@@ -184,7 +190,7 @@ def get_args(argv):
              'separate files.  By default, soluion sets will be '\
              'distinguished by file of origin as well as separators '\
              'and index columns.')
-    parser.add_argument('--index-columns', type=intrange,
+    parser.add_argument('--index-columns', type=intrange, nargs='+',
         help='Indices of columns that identify what solution set a point '\
              'belongs to.  Respects --reverse-column-indices.'\
              'If used in combination with separators, the number of '\
@@ -225,12 +231,11 @@ def get_args(argv):
              'Implies --skip-initial-lines up to the one on which '\
              'the header is found.  Compatible with a range for '\
              '--skip-initial-lines that includes the header.')
-    parser.add_argument('--header-regex', type=regex,
-        help='Lines matching this regular expression will be '\
-             'treated as headers for all following lines, '\
-             'until another header line or the end of the file '\
-             'is reached.  A new header is considered to separate '\
-             'solution sets.')
+    parser.add_argument('--header-leading-characters', type=str,
+        help='Leading characters that identify a new header and '\
+             'which are removed, including any whitespace that '\
+             'immediately follows, before the header is split '\
+             'by a delimiter.')
 
     # Handling defective input
     parser.add_argument('--malformed-lines', default='warn',
@@ -265,12 +270,15 @@ def get_args(argv):
     args = parser.parse_args(argv)
     args.objectives = rerange(args.objectives)
     args.maximize = rerange(args.maximize)
+    args.index_columns = rerange(args.index_columns)
 
     if args.reverse_column_indices:
         if args.objectives is not None:
             args.objectives = [-1 - ob for ob in args.objectives]
         if args.maximize is not None:
             args.maximize = [-1 -ob for ob in args.maximize]
+        if args.index_columns is not None:
+            args.index_columns = [-1 - c for c in args.index_columns]
 
     if args.tabs:
         args.delimiter = "\t"
@@ -303,6 +311,7 @@ def _noregex_lines_from_files(files, **kwargs):
     skip_initial_lines
     comment
     header_line
+    header_leading_characters
     """
     header = None
     sep = 0
@@ -310,6 +319,10 @@ def _noregex_lines_from_files(files, **kwargs):
     number = 0
     separator = kwargs.get('separator', None)
     comment = kwargs.get('comment', None)
+    if kwargs.get('header_leading_characters', None) is not None:
+        header_leader = kwargs['header_leading_characters']
+    else:
+        header_leader = None
 
     for fp in files:
         header = None
@@ -328,34 +341,24 @@ def _noregex_lines_from_files(files, **kwargs):
             for _ in range(number, kwargs.get('skip_initial_lines')):
                 number += 1
                 next(fp)
+        if header_leader is not None and header is not None:
+            if header.startswith(header_leader):
+                header = header.partition(header_leader)[2].strip()
 
         about = {'sep': sep, 'name': name, 'header': header}
-        if separator is None and comment is None:
-            for line in fp:
-                number += 1
+        for line in fp:
+            number += 1
+            if header_leader is not None and line.startswith(header_leader):
+                sep += 1
+                header = line.partition(header_leader)[2].strip()
+                about = {'sep': sep, 'name': name, 'header': header}
+            elif separator is not None and line.startswith(separator):
+                sep += 1
+                about = {'sep': sep, 'name': name, 'header': header}
+            elif comment is not None and line.startswith(comment):
+                pass 
+            else:
                 yield (line, number, about)
-        elif separator is None:
-            for line in fp:
-                number += 1
-                if not line.startswith(comment):
-                    yield (line, number, about)
-        elif comment is None:
-            for line in fp:
-                number += 1
-                if line.startswith(separator):
-                    sep += 1
-                    about = {'sep': sep, 'name': name, 'header': header}
-                else:
-                    yield (line, number, about)
-        else:
-            for line in fp:
-                number += 1
-                if not line.startswith(comment):
-                    if line.startswith(separator):
-                        sep += 1
-                        about = {'sep': sep, 'name': name, 'header': header}
-                    else:
-                        yield (line, number, about)
 
 def _regex_lines_from_files(files, **kwargs):
     """
@@ -368,7 +371,6 @@ def _regex_lines_from_files(files, **kwargs):
     comment
     comment_regex
     header_line
-    header_regex
     """
     # just pull lines from the noregex version and alter them
     # this saves us having to implement the initial line skipping
@@ -376,7 +378,6 @@ def _regex_lines_from_files(files, **kwargs):
     noregex = _noregex_lines_from_files(files, **kwargs)
     separator = kwargs.get('separator_regex', None)
     comment = kwargs.get('comment_regex', None)
-    header = kwargs.get('header_regex', None)
     sep_offset = 0
     sep = 0
     name = None
@@ -406,14 +407,6 @@ def _regex_lines_from_files(files, **kwargs):
                 new_about = {'sep': sep + sep_offset,
                              'name': name,
                              'header': new_header}
-        if header is not None:
-            if header.search(line) is not None:
-                sep_offset += 1
-                new_header = line
-                new_about = {'sep': sep + sep_offset,
-                             'name': name,
-                             'header': new_header}
-                continue
         yield (line, number, new_about)
 
 def lines_from_files(files, **kwargs):
@@ -427,45 +420,371 @@ def lines_from_files(files, **kwargs):
     comment
     comment_regex
     header_line
-    header_regex
     """
     regex = any(kwargs.get(key, None) is not None for key 
-                in ['separator_regex', 'comment_regex', 'header_regex'])
+                in ['separator_regex', 'comment_regex'])
     impure = any(kwargs.get(key, None) is not None for key
                  in ['separator', 'skip_initial_lines', 'comment',
                      'header_line'])
-    print('separator {0}'.format(kwargs.get('separator')))
-    print('comment {0}'.format(kwargs.get('comment')))
-    print('header_line {0}'.format(kwargs.get('header_line')))
     if regex:
-        print('using regex')
         implementation = _regex_lines_from_files
     elif impure:
-        print('using impure')
         implementation = _noregex_lines_from_files
     else:
-        print('using pure')
         implementation = _pure_lines_from_files
 
-    lines = implementation(files, **kwargs)
-    for line in lines:
-        yield line
+    decolines = implementation(files, **kwargs)
+    for decoline in decolines:
+        yield decoline
+
+def rows_from_lines(decolines, **kwargs):
+    """
+    produces decorated rows, no conversion to numbers yet
+    decolines: decorated lines
+    kwargs:
+    delimiter
+    tabs
+    """
+    if kwargs.get('tabs', False) is True:
+        delimiter = "\t"
+    else:
+        delimiter = kwargs.get('delimiter', ' ')
+    header = None
+    headerrow = None
+    old_about = None
+    for line, number, about in decolines:
+        line = line.strip()
+        if about['header'] is None and header is None:
+            pass # no change to header
+        elif about['header'] != header:
+            header = about['header']
+            headerrow = header.split(delimiter)
+        if about != old_about:
+            old_about = about
+            new_about = {'header': headerrow, 
+                         'name': about['name'], 
+                         'sep': about['sep']}
+        row = line.split(delimiter)
+        yield(row, number, new_about)
+
+def _ordered_rowsets_from_rows(decorows, **kwargs):
+    """
+    split rowsets on file, separator, and index columns
+    kwargs:
+    no_separate_files: grouping omits file and keeps incrementing sep instead
+    index_columns
+    index_column_names
+    """
+    if kwargs.get('no_separate_files', False) is True:
+        separate = False
+    else:
+        separate = True
+
+    index_columns = None
+    index_column_names = None
+    unknown_index = []
+    if kwargs.get('index_columns', None) is not None:
+        index_columns = kwargs['index_columns']
+        unknown_index = [''] * len(index_columns)
+    elif kwargs.get('index_column_names', None) is not None:
+        index_column_names = kwargs['index_column_names']
+        unknown_index = [''] * len(index_column_names)
+
+    name = ''
+    sep = 0
+    runningsep = 0
+    index = [x for x in unknown_index] #copy
+    if index_columns is not None:
+        unknown_index_columns = [x for x in index_columns]
+    else:
+        unknown_index_columns = [None for _ in unknown_index]
+    current_index_columns = [x for x in unknown_index_columns]
+    header = None
+    grouping = {'sep': sep, 'name': name, 'index': index}
+    inhibit = True # don't yield the dummy at the start
+
+    rowset = []
+    for row, number, about in decorows:
+        wrapup = False
+        if about['name'] != name:
+            if separate is False:
+                runningsep += sep
+            name = about['name']
+            sep = about['sep']
+            wrapup = True
+        if about['sep'] != sep:
+            sep = about['sep']
+            wrapup = True
+        if index_column_names is not None:
+            if about['header'] != header:
+                header = about['header']
+                current_index_columns = [x for x in unknown_index_columns]
+                for i, column_name in enumerate(index_column_names):
+                    if header is None:
+                        break
+                    try:
+                        current_index_columns[i] = header.index(column_name)
+                    except ValueError:
+                        current_index_columns[i] = None
+            about['index_columns'] = current_index_columns
+        if index_columns is not None:
+            about['index_columns'] = current_index_columns
+        if current_index_columns is not None:
+            current_index = [x for x in unknown_index] # copy
+            for i,j in enumerate(current_index_columns):
+                try:
+                    current_index[i] = row[j]
+                except TypeError: #None
+                    pass # let it remain the empty string
+            if not all(x == y for x, y in zip(index, current_index)):
+                index = current_index
+                wrapup = True
+        if wrapup:
+            if separate is False:
+                del grouping['name']
+            grouping['index'] = tuple(grouping['index'])
+            if not inhibit:
+                yield (rowset, grouping)
+            inhibit = False
+            rowset = []
+            name = about['name']
+            sep = about['sep']
+            grouping = {
+                'sep': runningsep + sep, 
+                'name': name, 
+                'index': index}
+        rowset.append((row, number, about))
+    if separate is False:
+        del grouping['name']
+    grouping['index'] = tuple(grouping['index'])
+    if not inhibit:
+        yield (rowset, grouping)
+
+def _no_order_rowsets_from_rows(decorows, **kwargs):
+    """
+    collect all rowsets, but then group only by index and,
+    unless no-separate-files is set, by file
+    """
+    ordered = _ordered_rowsets_from_rows(decorows, **kwargs)
+    together = dict()
+    for (rowset, grouping) in ordered:
+        if kwargs.get('no_separate_files', True) is False:
+            key = (grouping['index'], grouping['name'])
+        else:
+            key = grouping['index']
+        collector = together.get(key, [])
+        collector.extend(rowset)
+        together[key] = collector
+    if kwargs.get('no_separate_files', True) is False:
+        return [(collector, {'index': index, 'name': name})
+                for (index, name), collector in together.iteritems()]
+    else:
+        return [(collector, {'index': index})
+                for index, collector in together.iteritems()]
+
+def rowsets_from_rows(decorows, **kwargs):
+    """
+    decorows: string row, number, about, where about is
+              a dict with headerrow
+    kwargs:
+    index_columns
+    index_column_names
+    no_separate_files
+    no_order
+    """
+    if kwargs.get('no_order', False) is True:
+        return _no_order_rowsets_from_rows(decorows, **kwargs)
+    return _ordered_rowsets_from_rows(decorows, **kwargs)
+
+def _convert_objectives_from_indexed_columns(decorowset, **kwargs):
+    """
+    decorowset: (rowset, grouping)
+    """
+    column_indices = kwargs['objectives']
+    rowset, grouping = decorowset
+    if len(rowset) == 0:
+        return ([], grouping)
+    converted = []
+    for row, number, about in rowset:
+        try:
+            for i in column_indices:
+                row[i] = float(row[i])
+        except ValueError:
+            if kwargs['malformed_lines'] == 'ignore':
+                continue
+            msg = "Could not convert objective value to float "\
+                  "in line {0} of {1}."
+            msg = msg.format(number, about['name'])
+            raise InputError(msg)
+        except IndexError:
+            if kwargs['malformed_lines'] == 'ignore':
+                continue
+            msg = "Could not find all sepcified objectives "\
+                  "in line {0} of {1}."
+            msg = msg.format(number, about['name'])
+            raise InputError(msg)
+        converted.append((row, number, about))
+    return (converted, grouping)
+
+def _convert_objectives_from_named_columns(decorowset, **kwargs):
+    """
+    decorowset: (rowset, grouping)
+    """
+    column_names = kwargs['objective_column_names']
+    rowset, grouping = decorowset
+    if len(rowset) == 0:
+        return ([], grouping)
+    # we assume that all of the rows in the set have the
+    # same header because we split on header changes
+    _, number, about = rowset[0]
+    header = about['header']
+    try:
+        column_indices = [header.index(column_name) 
+                          for column_name in column_names]
+    except ValueError:
+        msg = "Header for line {0} in {1} (and {2} more lines) "\
+              "does not contain all of the specified objectives"
+        msg = msg.format(number, about['name'], len(rowset) - 1)
+        raise InputError(msg)
+    return _objectives_from_indexed_columns(
+        decorowset, objectives=column_indices, **kwargs)
+
+def _convert_objectives_from_all_columns(decorowset, **kwargs):
+    """
+    All rows need to have the same length.
+    decorowset: (rowset, grouping)
+    """
+    rowset, grouping = decorowset
+    if len(rowset) == 0:
+        return ([], grouping)
+    
+    converted = []
+    firstrow = True
+    nobj=0
+
+    if kwargs.get('index_columns', None) is not None:
+        index_columns = kwargs['index_columns']
+        for row, number, about in rowset:
+            nobj_seen = 0
+            try:
+                for i, x in row:
+                    if i in index_columns:
+                        continue
+                    nobj_seen += 1
+                    row[i] = float(row[i])
+            except ValueError:
+                if kwargs['malformed_lines'] == 'ignore':
+                    continue
+                msg = "Could not convert objective value to float "\
+                      "in line {0} of {1}."
+                msg = msg.format(number, about['name'])
+                raise InputError(msg)
+            if firstrow:
+                nobj = nobj_seen
+                firstrow = False
+            if nobj_seen != nobj:
+                if kwargs['malformed_lines'] == 'ignore':
+                    continue
+                msg = "Wrong number of objectives "\
+                      "in line {0} of {1}."
+                msg = msg.format(number, about['name'])
+                raise InputError(msg)
+            converted.append((row, number, about))
+    elif kwargs.get('index_column_names', None) is not None:
+        for row, number, about in rowset:
+            index_columns = about['index_columns']
+            nobj_seen = 0
+            try:
+                for i, x in row:
+                    if i in index_columns:
+                        continue
+                    nobj_seen += 1
+                    row[i] = float(row[i])
+            except ValueError:
+                if kwargs['malformed_lines'] == 'ignore':
+                    continue
+                msg = "Could not convert objective value to float "\
+                      "in line {0} of {1}."
+                msg = msg.format(number, about['name'])
+                raise InputError(msg)
+            if firstrow:
+                nobj = nobj_seen
+                firstrow = False
+            if nobj_seen != nobj:
+                if kwargs['malformed_lines'] == 'ignore':
+                    continue
+                msg = "Wrong number of objectives "\
+                      "in line {0} of {1}."
+                msg = msg.format(number, about['name'])
+                raise InputError(msg)
+            converted.append((row, number, about))
+    else: # no index columns, yay!
+        for row, number, about in rowset:
+            nobj_seen = 0
+            try:
+                for i in range(len(row)):
+                    row[i] = float(row[i])
+                    nobj_seen += 1
+            except ValueError:
+                if kwargs['malformed_lines'] == 'ignore':
+                    continue
+                msg = "Could not convert objective value to float "\
+                      "in line {0} of {1}."
+                msg = msg.format(number, about['name'])
+                raise InputError(msg)
+            if firstrow:
+                nobj = nobj_seen
+                firstrow = False
+            if nobj_seen != nobj:
+                if kwargs['malformed_lines'] == 'ignore':
+                    continue
+                msg = "Wrong number of objectives "\
+                      "in line {0} of {1}."
+                msg = msg.format(number, about['name'])
+                raise InputError(msg)
+            converted.append((row, number, about))
+    return (converted, grouping)
+
+def convert_objectives_from_rowsets(decorowsets, **kwargs):
+    if kwargs.get('objective_column_names', None) is not None:
+        implementation = _convert_objectives_from_named_columns
+    elif kwargs.get('objectives', None) is not None:
+        implementation = _convert_objectives_from_indexed_columns
+    else:
+        implementation = _convert_objectives_from_all_columns
+    for decorowset in decorowsets:
+        yield implementation(decorowset, **kwargs)
 
 def cli(args):
     """
     args (namespace): the result of parsing input options
     """
-    # pipeline stage 0: emit lines from files, decorated with relevant info
     files = args.inputs
     kwargs = args.__dict__
+
+    # pipeline: everything gets decorated with identifying info
+    # pipeline stage 0: emit lines from files, decorated with relevant info
     lff = lines_from_files(files, **kwargs)
-    for line, number, about in lff:
-        print(line, number, about) 
-    # pipeline stage 1: emit line sets decorated with identifying info
-    # pipeline stage 2: emit row sets (objectives only, converted to float) 
-    #                   decorated with identifying info
-    # pipeline stage 2a: emit eps-nondom sorted row sets, same decoration
-    # pipeline stage 2b: emit integral row sets, same decoration.
+    # pipeline stage 1: process delimiters to produce rows
+    rfl = rows_from_lines(lff, **kwargs)
+    # pipeline stage 2: collect rows into row sets
+    rfr = rowsets_from_rows(rfl, **kwargs)
+    # pipeline stage 3: extract objectives from rows
+    ofr = convert_objectives_from_rowsets(rfr, **kwargs)
+    for converted, grouping in ofr:
+        print(grouping, converted)
+
+    # pipeline stage 2.5: convert numbers from string to float
+    #
+    # -break- everything from here on should be in a separate
+    # method because it could be invoked programmatically
+    #
+    # pipeline stage 3: preliminary data processing
+    #                   * flip maximization columns
+    #                   * translate relative to ref point
+    #                   * eps sort
+    #                   * integer
+    # pipeline stage 2.5c: emit row sets reoriented to reference point
     # pipeline stage 3: emit hypervolumes
     # pipeline stage 4: write outputs
 
