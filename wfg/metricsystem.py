@@ -21,6 +21,8 @@ import argparse
 import ctypes
 import sys
 import math
+import pareto
+import wfg
 
 class InputError(Exception): pass
 
@@ -110,7 +112,9 @@ def get_args(argv):
     parser.add_argument('--objective-column-names', type=str, nargs='+',
         help='Names of objective columns')
     parser.add_argument('-m', '--maximize', type=intrange, nargs='+',
-        help='Objective columns to maximize, default is none. '\
+        help='Columns to maximize, default is none. '\
+             'All columns for which maximization is specified '\
+             'are considered to be objectives. '\
              'Maximized objectives are multiplied by -1.0 and '\
              'treated as minimization objectives.'\
              'The final hypervolume is also corrected by negation '\
@@ -119,7 +123,8 @@ def get_args(argv):
     parser.add_argument('-M', '--maximize-all', action='store_true',
         help='maximize all objectives')
     parser.add_argument('--maximize-column-names', type=str, nargs='+',
-        help='Names of columns to maximize.')
+        help='Names of columns to maximize.  These are automatically '\
+             'considered to be objectives')
     parser.add_argument("--reverse-column-indices", action='store_true',
         default=False, help='Reverse the order of column '\
         'indices.  May be useful if your objectives are '\
@@ -147,12 +152,27 @@ def get_args(argv):
         help='Reference point.  If one value is specified, it is '\
              'duplicated for all objectives.  If multiple values '\
              'are specified, only solution sets with the same '\
-             'number of objectives will be evaluated.  Default '\
-             'behavior is the same as "-R 0.0", treating the '\
-             'origin as a reference point.  Hard-to-interpret '\
-             'hypervolume data will result if the data straddle '\
-             'the reference point, so a zenith or nadir point is '\
-             'recommended.') 
+             'number of objectives will be evaluated.  '\
+             'Reference point must be a nadir.  Any inferior '\
+             'points will be clamped to the reference.')
+    parser.add_argument('--auto-reference', 
+        choices=['zero', 'first', 'full'],
+        help='Automatic reference point behavior. '\
+             '"zero" means that the origin is used.  '\
+             '"first" means that the nadir point for the first '\
+             'solution set in the input is used as a reference '\
+             'for every solution set. '\
+             '"full" means that the nadir point for all sets '\
+             'combined is used to compute hypervolume for each. '\
+             'The full option means that output will be written twice, '\
+             'so that an aborted run still produces useable output. '\
+             'The first-pass output will include the nadir point used '\
+             'for each set.'
+             'Combining auto reference with a specified reference point '\
+             'means that the reference point will be the nadir of the '\
+             'specified and automatic points.'\
+             'If neither this option nor a reference point is '\
+             'specified, the "zero" behavior is applied.')
 
     # scaling
     parser.add_argument('--scale',
@@ -260,8 +280,8 @@ def get_args(argv):
              '"zero" means that the output will report 0 '\
              "for the empty solution set's hypervolume.  "\
              '"skip" means that the output will increment the set counter '\
-             'if appropriate, but will not contain a row reporting hypervolume '\
-             'for the empty solution set.  '\
+             'if appropriate, but will not contain a row reporting '\
+             'hypervolume for the empty solution set.  '\
              '"skip-noincrement" means that the empty solution set '\
              'will be treated as if it did not exist at all.  The set '\
              'counter will not be incremented even if it would '\
@@ -279,6 +299,17 @@ def get_args(argv):
             args.maximize = [-1 -ob for ob in args.maximize]
         if args.index_columns is not None:
             args.index_columns = [-1 - c for c in args.index_columns]
+
+    # maximize columns must be objectives
+    if args.maximize is not None and args.objectives is not None:
+        for index in args.maximize:
+            if index not in args.objectives:
+                args.objectives.append(index)
+    if args.maximize_column_names is not None and \
+       args.objective_column_names is not None:
+        for name in args.maximize_column_names:
+            if name not in args.objective_column_names:
+                args.objective_column_names.append(name)
 
     if args.tabs:
         args.delimiter = "\t"
@@ -667,11 +698,11 @@ def _convert_objectives_from_all_columns(decorowset, **kwargs):
         for row, number, about in rowset:
             nobj_seen = 0
             try:
-                for i, x in row:
+                for i, x in enumerate(row):
                     if i in index_columns:
                         continue
                     nobj_seen += 1
-                    row[i] = float(row[i])
+                    row[i] = float(x)
             except ValueError:
                 if kwargs['malformed_lines'] == 'ignore':
                     continue
@@ -695,11 +726,11 @@ def _convert_objectives_from_all_columns(decorowset, **kwargs):
             index_columns = about['index_columns']
             nobj_seen = 0
             try:
-                for i, x in row:
+                for i, x in enumerate(row):
                     if i in index_columns:
                         continue
                     nobj_seen += 1
-                    row[i] = float(row[i])
+                    row[i] = float(x)
             except ValueError:
                 if kwargs['malformed_lines'] == 'ignore':
                     continue
@@ -722,8 +753,8 @@ def _convert_objectives_from_all_columns(decorowset, **kwargs):
         for row, number, about in rowset:
             nobj_seen = 0
             try:
-                for i in range(len(row)):
-                    row[i] = float(row[i])
+                for i, x in enumerate(row):
+                    row[i] = float(x)
                     nobj_seen += 1
             except ValueError:
                 if kwargs['malformed_lines'] == 'ignore':
@@ -755,6 +786,222 @@ def convert_objectives_from_rowsets(decorowsets, **kwargs):
     for decorowset in decorowsets:
         yield implementation(decorowset, **kwargs)
 
+def hypervolume(rows, **kwargs):
+    """
+    kwargs:
+    objectives: indices to use. if not specified, use all floats in each row
+    objective_column_names: names of objective columns.  requires header
+    maximize: indices to maximize
+    maximize_all: maximize all objectives
+    maximize_column_names: maximize named columns.  requires header
+    header: column names
+    epsilons: epsilons in order of provided objective indices
+    integer: Compute hypervolume based on box corners.  Requires epsilons.
+    reference: Reference point.  Default to zero if not specified.
+    scale: 'none' or None means not to scale.  'epsilon' divides objective
+           values by epsilon (requires epsilons).  'reference' divides 
+           objective values by reference point but fails if 
+           reference point has zeros.
+    """
+    rows, _ = apply_maximization(rows, **kwargs)
+    reference = kwargs.get('reference', None)
+    if reference is not None:
+        reference, _ = apply_maximization(
+            [reference], **kwargs)
+        reference = reference[0]
+        reference = [x for x in reference] # copy just in case
+
+    # finally, we can drop the stuff that's not objectives!!!!!
+    objectives = kwargs.get('objectives', None)
+    objective_column_names = kwargs.get('objective_column_names', None)
+    header = kwargs.get('header', None)
+    if objectives is not None:
+        pass # easy way to exclude the condition where both are not None
+    elif objective_column_names is not None and header is not None:
+        try:
+            objectives = [header.index(name) for name 
+                          in objective_column_names]
+        except ValueError:
+            raise InputError('not all objective names found in header')
+
+    objective_rows = []
+    if objectives is None:
+        for row in rows:
+            floats = [x for x in row if isinstance(x, float)]
+            objective_rows.append(floats)
+    else:
+        try:
+            for row in rows:
+                objective_rows.append([row[i] for i in objectives])
+        except IndexError:
+            raise InputError('objective missing from input row')
+
+    sys.stdout.flush()
+    # now we have objective rows, and maximization has been fixed up
+    # validate nobj
+    nobj=None
+    for row in objective_rows:
+        if nobj is None:
+            nobj = len(row)
+        if nobj != len(row):
+            raise InputError('input row has the wrong number of objectives')
+
+    # sort if epsilons specified
+    epsilons = None
+    if kwargs.get('epsilons', None) is not None:
+        epsilons = kwargs['epsilons']
+        objective_rows = pareto.eps_sort(objective_rows, epsilons=epsilons)
+
+    # Make integral, including reference point
+    # They and math on them are exact per the IEEE standard as long as
+    # we stay in integer-land and don't exceed certain limits.
+    # See http://stackoverflow.com/questions/3387655/safest-way-to-convert-float-to-integer-in-python
+    if kwargs.get('integer', False) is True and epsilons is not None:
+        if reference is not None:
+            for i, val in reference:
+                reference[i] = math.floor(val / epsilons[i])
+        for row in objective_rows:
+            for i, val in enumerate(row):
+                row[i] = math.floor(val / epsilons[i])
+    
+    # apply scale
+    scale = kwargs.get('scale', None)
+    if scale is not None and scale != 'none':
+        if scale == 'epsilon' and epsilons is not None:
+            if integer is False: # if true, scale is already applied
+                # scale reference point
+                if reference is not None:
+                    for i, val in reference:
+                        reference[i] = val / epsilons[i]
+                for row in objective_rows:
+                    for i, val in enumerate(row):
+                        row[i] = val / epsilons[i]
+        if scale == 'reference' and reference is not None:            
+            if 0.0 in reference:
+                raise InputError('cannot scale to zero reference')
+            for row in objective_rows:
+                for i, val in enumerate(row):
+                    row[i] = val / reference[i]
+            reference = [1.0] * len(reference)
+
+    # transform to reference point
+    if reference is not None:
+        for row in objective_rows:
+            for i, val in enumerate(row):
+                row[i] = reference[i] - val
+
+    # finally!  compute hypervolume
+    hv = wfg.wfg(objective_rows)
+    return hv
+
+def nadir(rows):
+    """
+    Assume each row has the same number of floats in it.
+    Assume minimization.
+    rows (list of lists): data to convert
+    returns nadir point
+    """
+    nadir = [x for x in rows[0] if isinstance(x, float)]
+    for row in rows[1:]:
+        current = [x for x in row if isinstance(x, float)]
+        nadir = [max([n, x]) for n,x in zip(nadir, current)]
+    return nadir
+
+def apply_maximization(rows, **kwargs):
+    """
+    apply maximization and produce kwargs that don't mention it
+    """
+    maximize = kwargs.get('maximize', None)
+    maximize_all = kwargs.get('maximize_all', None)
+    maximize_column_names =  kwargs.get('maximize_column_names', None)
+
+    if maximize is None and maximize_column_names is not None:
+        if header is not None:
+            try:
+                maximize = [header.index(col) for col in maximize_column_names]
+            except ValueError:
+                msg = "Not all maximization columns could be found in header"
+                raise InputError(msg)
+
+    transformed = []
+    if maximize is not None:
+        for row in rows:
+            trow = []
+            for i, x in enumerate(row):
+                if i in maximize:
+                    x = -1.0 * x
+                trow.append(x)
+            transformed.append(trow)
+    elif maximize_all is True:
+        for row in rows:
+            trow = []
+            for x in row:
+                if isinstance(x, float):
+                    trow.append(-1.0 * x)
+                else:
+                    trow.append(x)
+            transformed.append(trow)
+    else: # nothing to maximize, return the input
+        transformed = rows
+    transformed_kwargs = dict()
+    for key, val in kwargs.iteritems():
+        if "maximize" not in key:
+            transformed_kwargs[key] = val
+    return transformed, transformed_kwargs
+
+def hypervolumes_from_converted_sets(decosets, **kwargs):
+    """
+    Float conversion has been done at this point.
+    decosets: (rowset, grouping)
+    """
+    reference =  kwargs.get('reference', None)
+    auto_reference = kwargs.get('auto_reference', None)
+    if reference is None and auto_reference is None:
+        auto_reference = 'zero'
+
+    refpoint = None
+    for rowset, grouping in decosets:
+        if len(rowset) == 0:
+            print('TODO: handle empty!')
+            continue
+        header = rowset[0][2]['header']
+        rows = [row for row, _, _ in rowset]
+        # account for maximization now, even though hypervolume also
+        # does it
+        rows, processed_keywords = apply_maximization(
+            rows, header=header, **kwargs)
+        if reference is not None:
+            maxreference, _ = apply_maximization(
+                [reference], header=header, **kwargs)
+            maxreference = maxreference[0]
+        else:
+            maxreference = reference
+
+        if auto_reference is None:
+            refpoint = maxreference
+        elif auto_reference == 'zero':
+            refpoint = [0 for x in rows[0] if isinstance(x, float)]
+            if reference is not None:
+                refpoint = nadir([refpoint, maxreference])
+        elif auto_reference == 'first':
+            auto_reference = 'fixed'
+            refpoint = nadir(rows)
+            if reference is not None:
+                refpoint = nadir([refpoint, maxreference])
+        elif auto_reference == 'fixed':
+            pass # just don't update refpoint
+        elif auto_reference == 'full':
+            refpoint = nadir(rows)
+            if reference is not None:
+                refpoint = nadir([refpoint, maxreference])
+        else:
+            refpoint = maxreference
+        processed_keywords['reference'] = refpoint
+        grouping['reference'] = refpoint
+        processed_keywords['header'] = header
+        hv = hypervolume(rows, **processed_keywords)
+        yield (hv, grouping)
+
 def cli(args):
     """
     args (namespace): the result of parsing input options
@@ -770,23 +1017,24 @@ def cli(args):
     # pipeline stage 2: collect rows into row sets
     rfr = rowsets_from_rows(rfl, **kwargs)
     # pipeline stage 3: extract objectives from rows
-    ofr = convert_objectives_from_rowsets(rfr, **kwargs)
-    for converted, grouping in ofr:
-        print(grouping, converted)
+    cfr = convert_objectives_from_rowsets(rfr, **kwargs)
+    # pipeline stage 4: compute hypervolume
+    hfc = hypervolumes_from_converted_sets(cfr, **kwargs)
+    for hv, grouping in hfc:
+        print(hv)
 
-    # pipeline stage 2.5: convert numbers from string to float
-    #
+
     # -break- everything from here on should be in a separate
     # method because it could be invoked programmatically
     #
     # pipeline stage 3: preliminary data processing
     #                   * flip maximization columns
+    #                   * get down to just objectives, drop row annotations, and reorder if applicable
     #                   * translate relative to ref point
     #                   * eps sort
     #                   * integer
-    # pipeline stage 2.5c: emit row sets reoriented to reference point
-    # pipeline stage 3: emit hypervolumes
-    # pipeline stage 4: write outputs
+    # pipeline stage 4: emit hypervolumes
+    # pipeline stage 5: write outputs
 
 if __name__ == '__main__':
     cli(get_args(sys.argv))
