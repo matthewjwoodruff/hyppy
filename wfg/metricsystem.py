@@ -25,6 +25,7 @@ import pareto
 import wfg
 
 class InputError(Exception): pass
+class ReferencePointError(Exception): pass
 
 def rerange(intranges):
     """ 
@@ -887,6 +888,10 @@ def hypervolume(rows, **kwargs):
     # transform to reference point, clamping
     # wfg assumes maximization, so this assures nonnegative values
     if reference is not None:
+        if len(reference) == 1:
+            reference = reference * len(objective_rows[0])
+        elif len(reference) != len(objective_rows[0]):
+            raise ReferencePointError('Reference point does not match dimension of set')
         for row in objective_rows:
             for i, val in enumerate(row):
                 if val > reference[i]: #clamp!
@@ -926,6 +931,7 @@ def apply_maximization(rows, **kwargs):
                 msg = "Not all maximization columns could be found in header"
                 raise InputError(msg)
 
+    flipped_columns = []
     transformed = []
     if maximize is not None:
         for row in rows:
@@ -933,12 +939,15 @@ def apply_maximization(rows, **kwargs):
             for i, x in enumerate(row):
                 if i in maximize:
                     x = -1.0 * x
+                    # which objective in the sequence of objectives was maximized
+                    flipped_columns.append(maximize.index(i))
                 trow.append(x)
             transformed.append(trow)
     elif maximize_all is True:
         for row in rows:
             trow = []
-            for x in row:
+            for i, x in enumerate(row):
+                flipped_columns.append(i)
                 if isinstance(x, float):
                     trow.append(-1.0 * x)
                 else:
@@ -950,6 +959,7 @@ def apply_maximization(rows, **kwargs):
     for key, val in kwargs.iteritems():
         if "maximize" not in key:
             transformed_kwargs[key] = val
+    transformed_kwargs['flipped_columns'] = flipped_columns
     return transformed, transformed_kwargs
 
 def hypervolumes_from_converted_sets(decosets, **kwargs):
@@ -973,10 +983,15 @@ def hypervolumes_from_converted_sets(decosets, **kwargs):
         # does it
         rows, processed_keywords = apply_maximization(
             rows, header=header, **kwargs)
+        
         if reference is not None:
-            maxreference, _ = apply_maximization(
-                [reference], header=header, **kwargs)
-            maxreference = maxreference[0]
+            flipped_columns = processed_keywords['flipped_columns']
+            maxreference = []
+            for i, x in enumerate(reference):
+                if i in flipped_columns:
+                    maxreference.append(-1.0 * reference[i])
+                else:
+                    maxreference.append(reference[i])
         else:
             maxreference = reference
 
@@ -991,19 +1006,24 @@ def hypervolumes_from_converted_sets(decosets, **kwargs):
             refpoint = nadir(rows)
             if reference is not None:
                 refpoint = nadir([refpoint, maxreference])
+            print("auto reference first -> {0}".format(refpoint))
         elif auto_reference == 'fixed':
             pass # just don't update refpoint
         elif auto_reference == 'full':
             refpoint = nadir(rows)
             if reference is not None:
                 refpoint = nadir([refpoint, maxreference])
+            print("auto reference full -> {0}".format(refpoint))
         else:
             refpoint = maxreference
         processed_keywords['reference'] = refpoint
         grouping['reference'] = refpoint
         processed_keywords['header'] = header
-        hv = hypervolume(rows, **processed_keywords)
-        yield (hv, grouping)
+        try:
+            hv = hypervolume(rows, **processed_keywords)
+            yield (hv, grouping)
+        except ReferencePointError:
+            print("TODO: warnings for wrong dimension refernce point")
 
 def cli(args):
     """
