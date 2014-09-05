@@ -915,6 +915,19 @@ def nadir(rows):
         nadir = [max([n, x]) for n,x in zip(nadir, current)]
     return nadir
 
+def zenith(rows):
+    """
+    Assume each row has the same number of floats in it.
+    Assume minimization.
+    rows (list of lists): data to convert
+    returns zenith point
+    """
+    zenith = [x for x in rows[0] if isinstance(x, float)]
+    for row in rows[1:]:
+        current = [x for x in row if isinstance(x, float)]
+        zenith = [min([n, x]) for n,x in zip(zenith, current)]
+    return zenith
+
 def apply_maximization(rows, **kwargs):
     """
     apply maximization and produce kwargs that don't mention it
@@ -973,6 +986,7 @@ def hypervolumes_from_converted_sets(decosets, **kwargs):
         auto_reference = 'zero'
 
     refpoint = None
+    antirefpoint = None
     for rowset, grouping in decosets:
         if len(rowset) == 0:
             print('TODO: handle empty!')
@@ -1006,14 +1020,20 @@ def hypervolumes_from_converted_sets(decosets, **kwargs):
             refpoint = nadir(rows)
             if reference is not None:
                 refpoint = nadir([refpoint, maxreference])
-            print("auto reference first -> {0}".format(refpoint))
         elif auto_reference == 'fixed':
             pass # just don't update refpoint
         elif auto_reference == 'full':
-            refpoint = nadir(rows)
+            if refpoint is not None:
+                refpoint = nadir([nadir(rows), refpoint])
+            else:
+                refpoint = nadir(rows)
             if reference is not None:
                 refpoint = nadir([refpoint, maxreference])
-            print("auto reference full -> {0}".format(refpoint))
+            if antirefpoint is not None:
+                antirefpoint = zenith([zenith(rows), antirefpoint])
+            else:
+                antirefpoint = zenith(rows)
+            grouping['zenith'] = antirefpoint
         else:
             refpoint = maxreference
         processed_keywords['reference'] = refpoint
@@ -1022,8 +1042,18 @@ def hypervolumes_from_converted_sets(decosets, **kwargs):
         try:
             hv = hypervolume(rows, **processed_keywords)
             yield (hv, grouping)
-        except ReferencePointError:
-            print("TODO: warnings for wrong dimension refernce point")
+        except ReferencePointError as rpe:
+            if reference is not None:
+                sys.stderr.write("Supplied reference point does not match all input sets.\n")
+            if auto_reference == 'zero':
+                sys.stderr.write("THIS SHOULD NOT HAPPEN:\n"\
+                                 "An automatic zero reference point should never be the wrong size.\n")
+            else:
+                sys.stderr.write("WARNING: Sets changed size while using automatic reference point.\n"\
+                                 "         Skipping set index '{0}' from filename '{1}' "\
+                                 "after separator '{2}'.\n".format(
+                                     grouping.get('index', ''), grouping.get('name', ""),
+                                     grouping.get('sep', "")))
 
 def cli(args):
     """
@@ -1062,7 +1092,12 @@ def cli(args):
     if kwargs.get('reference') is not None:
         grouping_bits.append('reference')
         header.append('reference')
-    elif kwargs.get('auto_reference') is 'full':
+    elif kwargs.get('auto_reference') == 'full':
+        grouping_bits.append('reference')
+        grouping_bits.append('zenith')
+        header.append('reference')
+        header.append('zenith')
+    elif kwargs.get('auto_reference') == 'first':
         grouping_bits.append('reference')
         header.append('reference')
     header.append('hv')
