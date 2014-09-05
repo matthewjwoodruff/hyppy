@@ -743,8 +743,6 @@ def _convert_objectives_from_all_columns(decorowset, **kwargs):
                 nobj = nobj_seen
                 firstrow = False
             if nobj_seen != nobj:
-                if kwargs['malformed_lines'] == 'ignore':
-                    continue
                 msg = "Wrong number of objectives "\
                       "in line {0} of {1}."
                 msg = msg.format(number, about['name'])
@@ -758,8 +756,6 @@ def _convert_objectives_from_all_columns(decorowset, **kwargs):
                     row[i] = float(x)
                     nobj_seen += 1
             except ValueError:
-                if kwargs['malformed_lines'] == 'ignore':
-                    continue
                 msg = "Could not convert objective value to float "\
                       "in line {0} of {1}."
                 msg = msg.format(number, about['name'])
@@ -768,8 +764,6 @@ def _convert_objectives_from_all_columns(decorowset, **kwargs):
                 nobj = nobj_seen
                 firstrow = False
             if nobj_seen != nobj:
-                if kwargs['malformed_lines'] == 'ignore':
-                    continue
                 msg = "Wrong number of objectives "\
                       "in line {0} of {1}."
                 msg = msg.format(number, about['name'])
