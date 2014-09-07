@@ -628,12 +628,26 @@ def rowsets_from_rows(decorows, **kwargs):
         return _no_order_rowsets_from_rows(decorows, **kwargs)
     return _ordered_rowsets_from_rows(decorows, **kwargs)
 
+def _error_ignore(msg): """ ignore an error """; pass
+def _error_warn(msg): 
+    """ emit a warning on error """
+    sys.stderr.write(msg)
+    sys.stderr.write("\n")
+def _error_input_error(msg):
+    """ raise an exception on error """
+    raise InputError(msg)
+
 def _convert_objectives_from_indexed_columns(decorowset, **kwargs):
     """
     decorowset: (rowset, grouping)
+    kwargs:
+    error_handler: Callable taking one argument, a message.
+                   The error handler is called for malformed lines.
     """
     column_indices = kwargs['objectives']
     rowset, grouping = decorowset
+    error_handler = kwargs.get('error_handler', _error_input_error)
+
     if len(rowset) == 0:
         return ([], grouping)
     converted = []
@@ -642,19 +656,17 @@ def _convert_objectives_from_indexed_columns(decorowset, **kwargs):
             for i in column_indices:
                 row[i] = float(row[i])
         except ValueError:
-            if kwargs['malformed_lines'] == 'ignore':
-                continue
             msg = "Could not convert objective value to float "\
                   "in line {0} of {1}."
             msg = msg.format(number, about['name'])
-            raise InputError(msg)
+            error_handler(msg)
+            continue
         except IndexError:
-            if kwargs['malformed_lines'] == 'ignore':
-                continue
             msg = "Could not find all sepcified objectives "\
                   "in line {0} of {1}."
             msg = msg.format(number, about['name'])
-            raise InputError(msg)
+            error_handler(msg)
+            continue
         converted.append((row, number, about))
     return (converted, grouping)
 
@@ -689,6 +701,7 @@ def _convert_objectives_from_all_columns(decorowset, **kwargs):
     rowset, grouping = decorowset
     if len(rowset) == 0:
         return ([], grouping)
+    error_handler = kwargs.get('error_handler')
     
     converted = []
     firstrow = True
@@ -705,22 +718,20 @@ def _convert_objectives_from_all_columns(decorowset, **kwargs):
                     nobj_seen += 1
                     row[i] = float(x)
             except ValueError:
-                if kwargs['malformed_lines'] == 'ignore':
-                    continue
                 msg = "Could not convert objective value to float "\
                       "in line {0} of {1}."
                 msg = msg.format(number, about['name'])
-                raise InputError(msg)
+                error_handler(msg)
+                continue
             if firstrow:
                 nobj = nobj_seen
                 firstrow = False
             if nobj_seen != nobj:
-                if kwargs['malformed_lines'] == 'ignore':
-                    continue
                 msg = "Wrong number of objectives "\
                       "in line {0} of {1}."
                 msg = msg.format(number, about['name'])
-                raise InputError(msg)
+                error_handler(msg)
+                continue
             converted.append((row, number, about))
     elif kwargs.get('index_column_names', None) is not None:
         for row, number, about in rowset:
@@ -733,12 +744,11 @@ def _convert_objectives_from_all_columns(decorowset, **kwargs):
                     nobj_seen += 1
                     row[i] = float(x)
             except ValueError:
-                if kwargs['malformed_lines'] == 'ignore':
-                    continue
                 msg = "Could not convert objective value to float "\
                       "in line {0} of {1}."
                 msg = msg.format(number, about['name'])
-                raise InputError(msg)
+                error_handler(msg)
+                continue
             if firstrow:
                 nobj = nobj_seen
                 firstrow = False
@@ -746,7 +756,8 @@ def _convert_objectives_from_all_columns(decorowset, **kwargs):
                 msg = "Wrong number of objectives "\
                       "in line {0} of {1}."
                 msg = msg.format(number, about['name'])
-                raise InputError(msg)
+                error_handler(msg)
+                continue
             converted.append((row, number, about))
     else: # no index columns, yay!
         for row, number, about in rowset:
@@ -759,7 +770,8 @@ def _convert_objectives_from_all_columns(decorowset, **kwargs):
                 msg = "Could not convert objective value to float "\
                       "in line {0} of {1}."
                 msg = msg.format(number, about['name'])
-                raise InputError(msg)
+                error_handler(msg)
+                continue
             if firstrow:
                 nobj = nobj_seen
                 firstrow = False
@@ -767,11 +779,28 @@ def _convert_objectives_from_all_columns(decorowset, **kwargs):
                 msg = "Wrong number of objectives "\
                       "in line {0} of {1}."
                 msg = msg.format(number, about['name'])
-                raise InputError(msg)
+                error_handler(msg)
+                continue
             converted.append((row, number, about))
     return (converted, grouping)
 
 def convert_objectives_from_rowsets(decorowsets, **kwargs):
+    """
+    convert objectives in the manner requested by kwargs
+    kwargs:
+    Commandline args describe options in detail
+    malformed_lines: What to do if input lines are malformed.
+    objective_column_names: Names of objective columns
+    objectives: Indices of objective columns
+    """
+
+    on_malformed = kwargs.get('malformed_lines', 'empty')
+    if on_malformed in ['empty', 'exception']:
+        error_handler = _error_input_error
+    elif on_malformed == 'warn':
+        error_handler = _error_warn
+    elif on_malformed == 'ignore':
+        error_handler = _error_ignore
     if kwargs.get('objective_column_names', None) is not None:
         implementation = _convert_objectives_from_named_columns
     elif kwargs.get('objectives', None) is not None:
@@ -779,7 +808,13 @@ def convert_objectives_from_rowsets(decorowsets, **kwargs):
     else:
         implementation = _convert_objectives_from_all_columns
     for decorowset in decorowsets:
-        yield implementation(decorowset, **kwargs)
+        if on_malformed == 'empty':
+            try:
+                yield implementation(decorowset, error_handler=error_handler, **kwargs)
+            except InputError as ie:
+                yield ([], decorowset[1])
+        else: # allow exception to propagate
+            yield implementation(decorowset, error_handler=error_handler, **kwargs)
 
 def hypervolume(rows, **kwargs):
     """
@@ -983,7 +1018,7 @@ def hypervolumes_from_converted_sets(decosets, **kwargs):
     antirefpoint = None
     for rowset, grouping in decosets:
         if len(rowset) == 0:
-            print('TODO: handle empty!')
+            yield ('empty', grouping)
             continue
         header = rowset[0][2]['header']
         rows = [row for row, _, _ in rowset]
@@ -1049,26 +1084,17 @@ def hypervolumes_from_converted_sets(decosets, **kwargs):
                                      grouping.get('index', ''), grouping.get('name', ""),
                                      grouping.get('sep', "")))
 
-def cli(args):
+def write_output(hypervolumes, **kwargs):
     """
-    args (namespace): the result of parsing input options
+    write output
+    kwargs:
+    no_separate_files
+    no_order
+    index_column_names
+    index_columns
+    reference
+    auto_reference
     """
-    files = args.inputs
-    kwargs = args.__dict__
-
-    # pipeline: everything gets decorated with identifying info
-    # pipeline stage 0: emit lines from files, decorated with relevant info
-    lff = lines_from_files(files, **kwargs)
-    # pipeline stage 1: process delimiters to produce rows
-    rfl = rows_from_lines(lff, **kwargs)
-    # pipeline stage 2: collect rows into row sets
-    rfr = rowsets_from_rows(rfl, **kwargs)
-    # pipeline stage 3: extract objectives from rows
-    cfr = convert_objectives_from_rowsets(rfr, **kwargs)
-
-    # pipeline stage 4: compute hypervolume
-    hfc = hypervolumes_from_converted_sets(cfr, **kwargs)
-    # pipeline stage 5: write outputs
     grouping_bits = []
     header = []
     if kwargs.get('no_separate_files', False) is False:
@@ -1095,17 +1121,63 @@ def cli(args):
         grouping_bits.append('reference')
         header.append('reference')
     header.append('hv')
-    delimiter = args.delimiter
-    args.output.write(delimiter.join(header))
-    args.output.write('\n')
+    delimiter = kwargs.get('delimiter')
+    output = kwargs.get('output')
+    output.write(delimiter.join(header))
+    output.write('\n')
 
-    for hv, grouping in hfc:
-        the_hypervolume=hv # why does this prevent a weird bug?
-        args.output.write(delimiter.join(
-            [str(grouping[bit]) for bit in grouping_bits]))
-        args.output.write(delimiter)
-        args.output.write("{0:.5g}".format(the_hypervolume))
-        args.output.write('\n')
+    #    choices=['nan', 'zero', 'skip', 'skip-noincrement'],
+    on_empty = kwargs.get("empty_set_hypervolume", "nan")
+    sep_offset = 0
+    current_file = None
+    for hv, grouping in hypervolumes:
+        effective_grouping = dict([(k, v) for k, v in grouping.items()])
+        if on_empty == 'skip-noincrement': 
+            name = effective_grouping.get('name', None)
+            if name != current_file and kwargs.get('no_separate_files', False) is False:
+                current_file = name
+                sep_offset = 0
+            if effective_grouping.get('sep', None) is not None:
+                effective_grouping['sep'] -= sep_offset
+        if hv == 'empty':
+            if on_empty == 'nan':
+                the_hypervolume = float("NaN")
+            elif on_empty == 'zero': 
+                the_hypervolume = 0.0
+            elif on_empty == 'skip':
+                continue
+            elif on_empty == 'skip-noincrement':
+                sep_offset += 1
+                continue
+        else:
+            the_hypervolume=hv # why does this prevent a weird bug?
+        output.write(delimiter.join(
+            [str(effective_grouping[bit]) for bit in grouping_bits]))
+        output.write(delimiter)
+        output.write("{0:.5g}".format(the_hypervolume))
+        output.write('\n')
+
+def cli(args):
+    """
+    args (namespace): the result of parsing input options
+    """
+    files = args.inputs
+    kwargs = args.__dict__
+
+    # pipeline: everything gets decorated with identifying info
+    # pipeline stage 0: emit lines from files, decorated with relevant info
+    lff = lines_from_files(files, **kwargs)
+    # pipeline stage 1: process delimiters to produce rows
+    rfl = rows_from_lines(lff, **kwargs)
+    # pipeline stage 2: collect rows into row sets
+    rfr = rowsets_from_rows(rfl, **kwargs)
+    # pipeline stage 3: extract objectives from rows
+    cfr = convert_objectives_from_rowsets(rfr, **kwargs)
+
+    # pipeline stage 4: compute hypervolume
+    hfc = hypervolumes_from_converted_sets(cfr, **kwargs)
+    # pipeline stage 5: write outputs
+    write_output(hfc, **kwargs)
 
 if __name__ == '__main__':
     cli(get_args(sys.argv))
