@@ -46,8 +46,6 @@
 #define WORSE(x,y)   (BEATS(y,x) ? (x) : (y)) 
 #define BETTER(x,y)  (BEATS(y,x) ? (y) : (x)) 
 
-POINT ref; // the reference point 
-
 FRONT *fs;	// treat as an array of FRONTs
 int len_fs = 0;
 int fr = 0;     // current depth 
@@ -140,10 +138,10 @@ double hv2(FRONT ps)
 // returns the hypervolume of ps[0 ..] in 2D 
 // assumes that ps is sorted improving
 {
-  double volume = fabs((ps.points[0].objectives[0] - ref.objectives[0]) * 
-                       (ps.points[0].objectives[1] - ref.objectives[1])); 
+  double volume = fabs((ps.points[0].objectives[0]) * 
+                       (ps.points[0].objectives[1])); 
   for (int i = 1; i < ps.nPoints; i++) 
-    volume += fabs((ps.points[i].objectives[0] - ref.objectives[0]) * 
+    volume += fabs((ps.points[i].objectives[0]) * 
                    (ps.points[i].objectives[1] - ps.points[i - 1].objectives[1]));
   return volume;
 }
@@ -153,7 +151,7 @@ double inclhv(POINT p)
 {
   double volume = 1;
   for (int i = 0; i < nobj; i++) 
-    volume *= fabs(p.objectives[i] - ref.objectives[i]);
+    volume *= fabs(p.objectives[i]);
   return volume;
 }
 
@@ -183,7 +181,7 @@ double hv(FRONT ps)
   for (int i = ps.nPoints - 1; i >= 0; i--)
     // we can ditch dominated points here, 
     // but they will be ditched anyway in dominatedBit 
-    volume += fabs(ps.points[i].objectives[nobj] - ref.objectives[nobj]) * exclhv(ps, i);
+    volume += fabs(ps.points[i].objectives[nobj]) * exclhv(ps, i);
 
   nobj++; 
   return volume;
@@ -236,7 +234,7 @@ FRONT* allocate_fronts(){
   return frontstack;
 }
 
-double compute_hypervolume(FRONT* front, POINT* referencepoint)
+double compute_hypervolume(FRONT* front)
 {
   /* wrap the calls to hv / hv2 so that we 
   don't need to share globals */
@@ -249,7 +247,6 @@ double compute_hypervolume(FRONT* front, POINT* referencepoint)
 
   // recompute globals
   nobj = front->n;
-  ref = *referencepoint;
 
   /* end wrapping of globals */
   maxm = front->nPoints;
@@ -287,11 +284,7 @@ double hypervolume(int number_of_objectives, int number_of_points, double* value
         }
     }
 
-    POINT zero_refpoint;
-    zero_refpoint.objectives = malloc(sizeof(OBJECTIVE) * number_of_objectives);
-
-    double computed_hv = compute_hypervolume(&front, &zero_refpoint);
+    double computed_hv = compute_hypervolume(&front);
     cleanup_front(&front);
-    cleanup_point(&zero_refpoint);
     return computed_hv;
 }

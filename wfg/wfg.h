@@ -35,7 +35,7 @@ int compare_tree_asc( const void *p1, const void *p2);
 int greater(const void *v1, const void *v2);
 void cleanup_filecontents(FILECONTENTS* filecontents);
 void cleanup_point(POINT* point);
-double compute_hypervolume(FRONT* front, POINT* referencepoint);
+double compute_hypervolume(FRONT* front);
 double hypervolume(int nobj, int npoints, double* values);
 
 #endif
