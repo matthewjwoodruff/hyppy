@@ -46,8 +46,6 @@
 #define WORSE(x,y)   (BEATS(y,x) ? (x) : (y)) 
 #define BETTER(x,y)  (BEATS(y,x) ? (y) : (x)) 
 
-#define opt 2
-
 POINT ref; // the reference point 
 
 FRONT *fs;	// treat as an array of FRONTs
@@ -219,11 +217,11 @@ FRONT* allocate_fronts(){
    * as there are points in the biggest front.
   */
   FRONT* frontstack;
-    int maxd = nobj - (opt / 2 + 1); 
+    int maxd = nobj - 2; 
     len_fs = maxd;
     frontstack = malloc(sizeof(FRONT) * len_fs);
 
-    int maxp = maxm + 2 * (opt / 3);
+    int maxp = maxm;
     //int maxp = 100000;
     for (int i = 0; i < maxd; i++) 
       {frontstack[i].points = malloc(sizeof(POINT) * maxp); 
@@ -231,8 +229,8 @@ FRONT* allocate_fronts(){
        frontstack[i].n_allocated_points = maxp;
        for (int j = 0; j < maxp; j++) 
        {
-         // slicing (opt > 1) saves one extra objective at each level
-         frontstack[i].points[j].objectives = malloc(sizeof(OBJECTIVE) * (nobj - (i + 1) * (opt / 2)));
+         // slicing saves one extra objective at each level
+         frontstack[i].points[j].objectives = malloc(sizeof(OBJECTIVE) * (nobj - (i + 1)));
       }
   }
   return frontstack;
