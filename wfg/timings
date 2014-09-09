@@ -1,0 +1,98 @@
+With opt removed entirely:
+input front number hv
+ran.50pts.3d.20 1 420.92
+ran.50pts.3d.20 2 314.96
+ran.50pts.3d.20 3 663.07
+ran.50pts.3d.20 4 312.68
+ran.50pts.3d.20 5 577.29
+ran.50pts.3d.20 6 261.16
+ran.50pts.3d.20 7 376.18
+ran.50pts.3d.20 8 145.62
+ran.50pts.3d.20 9 415.14
+ran.50pts.3d.20 10 237.03
+ran.50pts.3d.20 11 304.3
+ran.50pts.3d.20 12 492.37
+ran.50pts.3d.20 13 217.25
+ran.50pts.3d.20 14 561.25
+ran.50pts.3d.20 15 702.12
+ran.50pts.3d.20 16 509.54
+ran.50pts.3d.20 17 243.99
+ran.50pts.3d.20 18 249.77
+ran.50pts.3d.20 19 579.97
+ran.50pts.3d.20 20 188.51
+real    0m0.174s
+user    0m0.150s
+sys     0m0.020s
+
+$ time python2 metricsystem.py thirteen -M -s "#"
+input front number hv
+thirteen 1 7.9458e+10
+thirteen 2 1.1322e+11
+thirteen 3 6.2388e+11
+thirteen 4 1.5051e+10
+real    0m15.338s
+user    0m15.267s
+sys     0m0.017s
+
+$ time ./wfg2reference ran.50pts.3d.20 
+No reference point provided: using the origin
+hv(1) = 420.9157937854
+Time: 0.000000 (s)
+hv(2) = 314.9607306193
+Time: 0.000000 (s)
+hv(3) = 663.0700463699
+Time: 0.000000 (s)
+hv(4) = 447.7808989788
+Time: 0.000000 (s)
+hv(5) = 577.2869694112
+Time: 0.000000 (s)
+hv(6) = 558.1743910434
+Time: 0.000000 (s)
+hv(7) = 376.1782035395
+Time: 0.000000 (s)
+hv(8) = 145.6237883536
+Time: 0.000000 (s)
+hv(9) = 415.1374490645
+Time: 0.000000 (s)
+hv(10) = 286.6852582773
+Time: 0.000000 (s)
+hv(11) = 304.2986767407
+Time: 0.000000 (s)
+hv(12) = 492.3748651029
+Time: 0.000000 (s)
+hv(13) = 217.2465220667
+Time: 0.000000 (s)
+hv(14) = 603.6544059577
+Time: 0.000000 (s)
+hv(15) = 702.1218570090
+Time: 0.000000 (s)
+hv(16) = 509.5372768990
+Time: 0.000000 (s)
+hv(17) = 567.8103779492
+Time: 0.000000 (s)
+hv(18) = 249.7652859076
+Time: 0.000000 (s)
+hv(19) = 579.9724835200
+Time: 0.000000 (s)
+hv(20) = 379.7277340091
+Time: 0.000000 (s)
+
+real    0m0.011s
+user    0m0.007s
+sys     0m0.003s
+
+$ time ./wfg2reference thirteen
+
+No reference point provided: using the origin
+hv(1) = 79457954259.3537597656
+Time: 1.523333 (s)
+hv(2) = 113223068180.6866912842
+Time: 2.870000 (s)
+hv(3) = 623880974688.9278564453
+Time: 0.653333 (s)
+hv(4) = 97713448855.6325836182
+Time: 8.280000 (s)
+
+real    0m13.368s
+user    0m13.333s
+sys     0m0.003s
