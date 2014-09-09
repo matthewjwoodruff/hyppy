@@ -27,10 +27,10 @@ architecture:
 	$(if $(march), , $(march_error))
 
 libwfg2.so: wfg.c wfg.h architecture
-	$(CC) $(CFLAGS) $(OPT) -Dopt=2 -fPIC -shared wfg.c -o libwfg2.so
+	$(CC) $(CFLAGS) $(OPT) -fPIC -shared wfg2.c -o libwfg2.so
 
 libwfg2_debug.so: wfg.c wfg.h
-	$(CC) $(CFLAGS) $(DEBUG) -Dopt=2 -fPIC -shared -o libwfg2_debug.so wfg.c 
+	$(CC) $(CFLAGS) $(DEBUG) -fPIC -shared -o libwfg2_debug.so wfg2.c 
 
 pythontest: libwfg2_debug.so test.py
 	python2 test.py
