@@ -23,6 +23,7 @@ import sys
 import math
 import pareto
 import wfg
+import zn
 
 class InputError(Exception): pass
 class ReferencePointError(Exception): pass
@@ -288,6 +289,8 @@ def get_args(argv):
              'counter will not be incremented even if it would '\
              'be appropriate to do so.')
 
+    parser.add_argument("--ZN", action='store_true',
+            help='use ZN hypervolume algorithm rather than WFG')
     args = parser.parse_args(argv)
     args.objectives = rerange(args.objectives)
     args.maximize = rerange(args.maximize)
@@ -928,7 +931,10 @@ def hypervolume(rows, **kwargs):
                 row[i] = reference[i] - val
 
     # finally!  compute hypervolume
-    hv = wfg.wfg(objective_rows)
+    if kwargs.get('ZN', False) is True:
+        hv = zn.zn(objective_rows)
+    else:
+        hv = wfg.wfg(objective_rows)
     return hv
 
 def nadir(rows):
