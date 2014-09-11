@@ -6,6 +6,7 @@ Matthew Woodruff
 2014-09-10
 LGPL
 """
+import copy
 
 def zn(rows):
     """
@@ -13,6 +14,8 @@ def zn(rows):
     Assume maximization relative to origin.
     """
     nobj = len(rows[0])
+    if nobj == 0:
+        return 1.0
     nadir = [float("inf")]*nobj
     zenith = [-float("inf")]*nobj
     zenith_contributors = [nadir] * nobj
@@ -28,60 +31,33 @@ def zn(rows):
 
     for row in rows:
         for i, val in enumerate(row):
+            nadir[i] = min((nadir[i], val))
             if val > zenith[i]:
                 zenith[i] = val
-                zenith_contributors[i] = row
+                zenith_contributors[i] = copy.copy(row)
             elif val == zenith[i]:
                 if any(r > zc for r, zc in zip(row, zenith_contributors[i])):
-                    zenith_contributors[i] = row
-        print("row {0}, zc {1}".format(row, zenith_contributors))
+                    zenith_contributors[i] = copy.copy(row)
 
-    for zc in zenith_contributors:
-        for i, val in enumerate(zc):
-            nadir[i] = min([nadir[i], val])
-
-    for axis in range(nobj-1):
-        # step along axis, add volumes from next axis, with other
-        # dimensions clamped to nadir
-        inorder = sorted(zenith_contributors, key=lambda row: row[axis])
-        inorder = [[y for y in x] for x in inorder]
-        relative_to = [0.0] * nobj
-
-        for i in range(axis): # axes already visited
-            relative_to[i] = nadir[i]
-        print("inorder {0}, relative to {1}".format(inorder, relative_to))
-
-        while len(inorder) > 0:
-            point = inorder[0]
-
-            # axis+1 gets the best value remaining
-            #point[axis+1] = max([x[axis+1] for x in inorder])
-
-            # higher axes get nadir value
-            for i in range(axis+2, nobj):
-                point[i] = nadir[i]
-
-            # compute volume
-            chunk = 1.0
-            for x, r in zip(point, relative_to):
-                chunk *= (x-r)
-            vol += chunk
-
-            print("adding {0} for {1} relative to {2}".format(chunk, point, relative_to))
-
-            # update point relative to
-            relative_to[axis] = point[axis]
-
-            # remove point
-            inorder.pop(0)
+    # find hypervolume one dimension down for each silhouette
+    for axis in range(nobj):
+        offset = nadir[axis]
+        sil = []
+        for row in zenith_contributors:
+            sil.append([row[i] for i in range(nobj) if i != axis])
+        sil = [list(row) for row in list(set([tuple(row) for row in sil]))]
+        print("silhouette for axis {0} is {1}")
+        down_one = zn(sil)
+        vol += offset * down_one
+        for row in zenith_contributors:
+            row[axis] -= offset
 
     # translate nadir to origin
     transformed = []
     for row in rows:
         transformed.append([r-n for r, n in zip(row, nadir)])
 
-    # compute hv on the remaining points
+    # compute hv on the translated points
     vol += zn(transformed)
 
-    # this could *easily* be made tail-recursive by passing vol
     return vol
