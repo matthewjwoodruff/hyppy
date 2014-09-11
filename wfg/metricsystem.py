@@ -612,10 +612,10 @@ def _no_order_rowsets_from_rows(decorows, **kwargs):
         together[key] = collector
     if kwargs.get('no_separate_files', True) is False:
         return [(collector, {'index': index, 'name': name})
-                for (index, name), collector in together.iteritems()]
+                for (index, name), collector in together.items()]
     else:
         return [(collector, {'index': index})
-                for index, collector in together.iteritems()]
+                for index, collector in together.items()]
 
 def rowsets_from_rows(decorows, **kwargs):
     """
@@ -1004,7 +1004,7 @@ def apply_maximization(rows, **kwargs):
     else: # nothing to maximize, return the input
         transformed = rows
     transformed_kwargs = dict()
-    for key, val in kwargs.iteritems():
+    for key, val in kwargs.items():
         if "maximize" not in key:
             transformed_kwargs[key] = val
     transformed_kwargs['flipped_columns'] = flipped_columns
