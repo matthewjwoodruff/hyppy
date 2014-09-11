@@ -7,21 +7,14 @@ Matthew Woodruff
 LGPL
 """
 import copy
-current_depth = -1
 
 def zn(rows):
     """
     rows: the set of rows for which to compute hypervolume
     Assume maximization relative to origin.
     """
-    global current_depth
-    current_depth += 1
-    indent = "".join(["  "]*current_depth)
-    print("".join([indent, "call at depth {0}, rows {1}".format(current_depth, rows)]))
     nobj = len(rows[0])
     if nobj == 0:
-        print("".join([indent,"return 1.0 at depth {0}, rows {1}".format(current_depth, rows)]))
-        current_depth -= 1
         return 1.0
     nadir = [float("inf")]*nobj
     zenith = [-float("inf")]*nobj
@@ -34,8 +27,6 @@ def zn(rows):
             if not any([x <= 0 for x in r])]
 
     if len(rows) == 0:
-        print("".join([indent,"return 0.0 at depth {0}, rows {1}".format(current_depth, rows)]))
-        current_depth -= 1
         return 0.0
 
     for row in rows:
@@ -56,23 +47,13 @@ def zn(rows):
             sil.append([row[i] for i in range(nobj) if i != axis])
         sil = [list(row) for row in list(set([tuple(row) for row in sil]))]
         down_one = zn(sil)
-        print("".join(
-            [indent,"silhouette for axis {0} is {1}".format(axis, sil)]))
-        print("".join(
-            [indent, 
-             "down one hypervolume is {0} with offset {1} for a contribution of {2}".format(
-                           down_one, offset, offset*down_one)]))
         vol += offset * down_one
-        print("".join([indent, "for a running volume of {0}".format(vol)]))
         for row in zenith_contributors:
             row[axis] -= offset
 
     nadir_hypervolume = 1.0
     for x in nadir:
         nadir_hypervolume *= x
-    print("".join(
-        [indent, 
-         "depth {0} nadir HV is {1}".format(current_depth, nadir_hypervolume)]))
     
     # translate nadir to origin
     transformed = []
@@ -82,8 +63,4 @@ def zn(rows):
     # compute hv on the translated points
     vol += zn(transformed)
 
-    print("".join(
-        [indent, 
-         "return at depth {0}, rows {1}".format(current_depth, rows)]))
-    current_depth -= 1
     return vol
