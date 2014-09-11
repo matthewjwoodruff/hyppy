@@ -46,8 +46,9 @@ def zn(rows):
         for row in zenith_contributors:
             sil.append([row[i] for i in range(nobj) if i != axis])
         sil = [list(row) for row in list(set([tuple(row) for row in sil]))]
-        print("silhouette for axis {0} is {1}")
+        print("silhouette for axis {0} is {1}".format(axis, sil))
         down_one = zn(sil)
+        print("down one hypervolume is {0}".format(down_one))
         vol += offset * down_one
         for row in zenith_contributors:
             row[axis] -= offset
