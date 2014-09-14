@@ -67,10 +67,6 @@ def _zn(rows):
     while len(rows) > 0:
         nadir = [float("inf")]*nobj
 
-        #if len(rows) == 1:
-        #    vol += sum([rows[0][i]**2 for i in range(nobj)])
-        #    break
-
         for rowindex, row in enumerate(rows):
             for i, val in enumerate(row):
                 if val < nadir[i]:
@@ -83,7 +79,6 @@ def _zn(rows):
 
             offset = nadir[axis]
             if nobj > 1:
-                sil = []
                 for row in rows:
                     sil.append([row[i] for i in range(nobj) if i != axis])
                     carry_along.append(row[axis])
@@ -99,18 +94,29 @@ def _zn(rows):
             # now if there's exactly one nadir point, we can compute its
             # one-down hypervolume easily, do another step, and remove it 
             # from the set
-            if False:
-                contributor = nadir_contributors[axis]
-                backup = nadir_backup[axis]
-                offset2 = rows[backup][axis] - rows[contributor][axis]
-                vol += offset2 * down_one
-                subtract_box = sum([rows[contributor][i]**2 for i in range(nobj) if i != axis])
-                vol -= offset2 * subtract_box
-                for a in range(nobj): # can't use it twice
-                    if nadir_contributors[a] == contributor:
-                        nadir_contributors[a] = None
-                        nadir_backup[a] = None
-                offset += offset2
+            if len(carry_along) > 1:
+                least = float("inf")
+                second_least = float("inf")
+                lindex  = None
+                slindex = None
+                for idx, calong in enumerate(carry_along):
+                    if calong < least:
+                        second_least = least
+                        slindex = lindex
+                        least = calong
+                        lindex = idx
+                    if calong == least:
+                        lindex = None
+                        slindex = None
+                    elif calong < second_least:
+                        second_least = calong
+                        slindex = idx
+                if lindex is not None and slindex is not None:
+                    offset2 = carry_along[slindex] - carry_along[lindex]
+                    subtract_box = sum([sil[lindex][i]**2 for i in range(nobj-1)])
+                    vol += offset2 * down_one
+                    vol -= offset2 * subtract_box
+                    offset += offset2
 
             for row in rows: # translates to nadir
                 row[axis] -= offset
