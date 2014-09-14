@@ -2,3 +2,41 @@ Profiling
 
 Look into sprof, gprof, profil
 
+# But before we do that, holy stack frames, batman!
+
+I put some prints in zn.py to show what was happening.  
+This is the number of calls for each nobj.
+
+About the output:  
+Hmmm..
+209 / 19 ~ 10
+598 / 209 ~ 3
+288 / 598 ~ 0.5
+
+This is pretty consistent, give or take a little, as we go.  What does it mean?
+Well, level 1 is the 2d silhouettes.  Does it make sense that we do *ten* of
+those calls for each point?  Wait, look at the input file.  There are really
+50 points.  So that's pretty good.  For a random set, we get away without doing
+an iteration for about 60% of the points.
+
+Now, let's consider the calls at 0:  those are a total waste and we could cut
+them right out.
+
+input front number hv
+{0: 288, 1: 598, 2: 209, 3: 19}
+461 steps
+ran.50pts.3d.20 1 420.92
+... more snipped ...
+
+Here's if we just cut out those superfluous calls.
+input front number hv
+{1: 598, 2: 209, 3: 19}
+461 steps
+ran.50pts.3d.20 1 420.92
+... more snipped ...
+
+So we're saving a lot of calls.  Let's look at those numbers again.  For this
+particular set, we only need to do 19 steps.  Note also that we're confounding
+the two ways we recurse.  We really need to iterate as we step the nadir.
+Although let's not get our hopes up that this would reduce the run time --- it
+didn't help at all for hyppy.

@@ -8,6 +8,9 @@ LGPL
 """
 import copy
 
+calls_at_level = dict()
+step = 0
+
 def sort(rows):
     """
     true Pareto sort assuming maximization
@@ -51,17 +54,23 @@ def sort(rows):
             asize += 1
     return archive
 
-def zn(rows):
+def _zn(rows):
     """
     rows: the set of rows for which to compute hypervolume
     Assume maximization relative to origin.
     """
+    global calls_at_level
+    global step
+    level = len(rows[0])
+    calls_at_level[level] = calls_at_level.get(level, 0)
+    calls_at_level[level] += 1
+
     nobj = len(rows[0])
     if nobj == 0:
         return 1.0
     nadir = [float("inf")]*nobj
     zenith = [-float("inf")]*nobj
-    zenith_contributors = [nadir] * nobj
+    nadir_contributors = [None]*nobj # indices of nadir components
     vol = 0.0
 
     # discard points that are at zero
@@ -79,16 +88,30 @@ def zn(rows):
     # find hypervolume one dimension down for each silhouette
     for axis in range(nobj):
         offset = nadir[axis]
-        sil = []
-        for row in rows:
-            sil.append([row[i] for i in range(nobj) if i != axis])
-        sil = sort(sil)
-        down_one = zn(sil)
+        if nobj > 1:
+            sil = []
+            for row in rows:
+                sil.append([row[i] for i in range(nobj) if i != axis])
+            sil = sort(sil)
+            down_one = _zn(sil)
+        else:
+            down_one = 1.0
         vol += offset * down_one
         for row in rows:
             row[axis] -= offset
 
     # compute hv on the translated points
-    vol += zn(rows)
+    step += 1 # count the steps
+    vol += _zn(rows)
 
     return vol
+
+def zn(rows):
+    global calls_at_level
+    global step
+    hv = _zn(rows)
+    print(calls_at_level)
+    print("{0} steps".format(step))
+    calls_at_level = dict()
+    step = 0
+    return hv
