@@ -73,3 +73,11 @@ real    0m1.653s
 user    0m1.643s
 sys     0m0.007s
 
+For comparison, here's the old version:
+$ time python metricsystem.py -M -s "#" --ZN ran.50pts.3d.20  
+input front number hv
+... snip correct output ...
+real    0m2.035s
+user    0m2.020s
+sys     0m0.007s
+

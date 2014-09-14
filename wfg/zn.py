@@ -62,10 +62,25 @@ def _zn(rows):
 
     while len(rows) > 0:
         nadir = [float("inf")]*nobj
-        #nadir_contributors = [None]*nobj # indices of nadir components
-        for row in rows:
+        second_nadir = [float("inf")]*nobj
+        nadir_contributors = [None]*nobj # indices of nadir components
+        nadir_backup = [None]*nobj # indices of backup nadir components
+
+        if len(rows) == 1:
+            vol += sum([rows[0][i]**2 for i in range(nobj)])
+            break
+
+        for rowindex, row in enumerate(rows):
             for i, val in enumerate(row):
-                nadir[i] = min((nadir[i], val))
+                if val < nadir[i]:
+                    nadir[i] = val
+                    nadir_backup[i] = nadir_contributors[i]
+                    nadir_contributors[i] = rowindex
+                elif val < second_nadir[i]:
+                    nadir_backup[i] = rowindex
+                elif val == nadir[i]: # there can be only one
+                    nadir_contributors[i] = None
+
         # find hypervolume one dimension down for each silhouette
         for axis in range(nobj):
             offset = nadir[axis]
@@ -81,10 +96,27 @@ def _zn(rows):
             else:
                 down_one = 1.0
             vol += offset * down_one
+
+            # now if there's exactly one nadir point, we can compute its
+            # one-down hypervolume easily, do another step, and remove it 
+            # from the set
+            if nadir_contributors[axis] is not None and nadir_backup[axis] is not None:
+                contributor = nadir_contributors[axis]
+                backup = nadir_backup[axis]
+                offset2 = rows[backup][axis] - rows[contributor][axis]
+                vol += offset2 * down_one
+                subtract_box = sum([rows[contributor][i]**2 for i in range(nobj) if i != axis])
+                vol -= offset2 * subtract_box
+                for a in range(nobj): # can't use it twice
+                    if nadir_contributors[a] == contributor:
+                        nadir_contributors[a] = None
+                        nadir_backup[a] = None
+                offset += offset2
+
             for row in rows: # translates to nadir
                 row[axis] -= offset
 
-        # discard points that are at zero
+        # discard points that are at zero or less
         rows = [
                 r for r in rows 
                 if not any([x <= 0 for x in r])]
