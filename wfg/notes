@@ -40,3 +40,27 @@ particular set, we only need to do 19 steps.  Note also that we're confounding
 the two ways we recurse.  We really need to iterate as we step the nadir.
 Although let's not get our hopes up that this would reduce the run time --- it
 didn't help at all for hyppy.
+
+So this subjectively seems faster.
+input front number hv
+{1: 336, 2: 54, 3: 1}
+ran.50pts.3d.20 1 420.92
+{1: 340, 2: 54, 3: 1}
+ran.50pts.3d.20 2 314.96
+{1: 344, 2: 54, 3: 1}
+ran.50pts.3d.20 3 663.07
+{1: 324, 2: 51, 3: 1}
+... more snipped ...
+
+And now we have really isolated what's going on.  Furthermore, we can now get
+rid of the calls at depth one because that's just the value of the one
+dimension.
+input front number hv
+{2: 54, 3: 1}
+ran.50pts.3d.20 1 420.92
+{2: 54, 3: 1}
+ran.50pts.3d.20 2 314.96
+{2: 54, 3: 1}
+ran.50pts.3d.20 3 663.07
+
+Now that's way fewer calls, and way less heap allocation!

@@ -6,10 +6,7 @@ Matthew Woodruff
 2014-09-10
 LGPL
 """
-import copy
-
 calls_at_level = dict()
-step = 0
 
 def sort(rows):
     """
@@ -60,7 +57,6 @@ def _zn(rows):
     Assume maximization relative to origin.
     """
     global calls_at_level
-    global step
     level = len(rows[0])
     calls_at_level[level] = calls_at_level.get(level, 0)
     calls_at_level[level] += 1
@@ -68,50 +64,42 @@ def _zn(rows):
     nobj = len(rows[0])
     if nobj == 0:
         return 1.0
-    nadir = [float("inf")]*nobj
-    zenith = [-float("inf")]*nobj
-    nadir_contributors = [None]*nobj # indices of nadir components
     vol = 0.0
 
-    # discard points that are at zero
-    rows = [
-            r for r in rows 
-            if not any([x <= 0 for x in r])]
-
-    if len(rows) == 0:
-        return 0.0
-
-    for row in rows:
-        for i, val in enumerate(row):
-            nadir[i] = min((nadir[i], val))
-
-    # find hypervolume one dimension down for each silhouette
-    for axis in range(nobj):
-        offset = nadir[axis]
-        if nobj > 1:
-            sil = []
-            for row in rows:
-                sil.append([row[i] for i in range(nobj) if i != axis])
-            sil = sort(sil)
-            down_one = _zn(sil)
-        else:
-            down_one = 1.0
-        vol += offset * down_one
+    while len(rows) > 0:
+        nadir = [float("inf")]*nobj
+        #nadir_contributors = [None]*nobj # indices of nadir components
         for row in rows:
-            row[axis] -= offset
+            for i, val in enumerate(row):
+                nadir[i] = min((nadir[i], val))
+        # find hypervolume one dimension down for each silhouette
+        for axis in range(nobj):
+            offset = nadir[axis]
+            if nobj > 1:
+                sil = []
+                for row in rows:
+                    sil.append([row[i] for i in range(nobj) if i != axis])
+                sil = sort(sil)
+                if nobj == 2 and len(sil) == 1:
+                    down_one = sil[0][0] # one dimensional hv is easy
+                else:
+                    down_one = _zn(sil)
+            else:
+                down_one = 1.0
+            vol += offset * down_one
+            for row in rows: # translates to nadir
+                row[axis] -= offset
 
-    # compute hv on the translated points
-    step += 1 # count the steps
-    vol += _zn(rows)
+        # discard points that are at zero
+        rows = [
+                r for r in rows 
+                if not any([x <= 0 for x in r])]
 
     return vol
 
 def zn(rows):
     global calls_at_level
-    global step
     hv = _zn(rows)
     print(calls_at_level)
-    print("{0} steps".format(step))
     calls_at_level = dict()
-    step = 0
     return hv
