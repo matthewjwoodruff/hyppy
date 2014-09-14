@@ -6,14 +6,16 @@ Matthew Woodruff
 2014-09-10
 LGPL
 """
-def sort(rows):
+def pareto(rows, carry_along):
     """
     true Pareto sort assuming maximization
+    carrys along additional info
     """
     archive = []
+    carry_along_archive = []
     asize = 0
 
-    for row in rows:
+    for row, calong in zip(rows, carry_along):
         ai = -1
         adominate = False # archive dominates
         sdominate = False # solution dominates
@@ -41,13 +43,15 @@ def sort(rows):
                 break
             if sdominate:
                 archive.pop(ai)
+                carry_along_archive.pop(ai)
                 ai -= 1
                 asize -= 1
                 continue 
         if nondominate or sdominate or not adominate:
             archive.append(row)
+            carry_along_archive.append(calong)
             asize += 1
-    return archive
+    return archive, carry_along_archive
 
 def _zn(rows):
     """
@@ -62,33 +66,28 @@ def _zn(rows):
 
     while len(rows) > 0:
         nadir = [float("inf")]*nobj
-        second_nadir = [float("inf")]*nobj
-        nadir_contributors = [None]*nobj # indices of nadir components
-        nadir_backup = [None]*nobj # indices of backup nadir components
 
-        if len(rows) == 1:
-            vol += sum([rows[0][i]**2 for i in range(nobj)])
-            break
+        #if len(rows) == 1:
+        #    vol += sum([rows[0][i]**2 for i in range(nobj)])
+        #    break
 
         for rowindex, row in enumerate(rows):
             for i, val in enumerate(row):
                 if val < nadir[i]:
                     nadir[i] = val
-                    nadir_backup[i] = nadir_contributors[i]
-                    nadir_contributors[i] = rowindex
-                elif val < second_nadir[i]:
-                    nadir_backup[i] = rowindex
-                elif val == nadir[i]: # there can be only one
-                    nadir_contributors[i] = None
 
         # find hypervolume one dimension down for each silhouette
         for axis in range(nobj):
+            sil = []
+            carry_along = []
+
             offset = nadir[axis]
             if nobj > 1:
                 sil = []
                 for row in rows:
                     sil.append([row[i] for i in range(nobj) if i != axis])
-                sil = sort(sil)
+                    carry_along.append(row[axis])
+                sil, carry_along = pareto(sil, carry_along)
                 if nobj == 2 and len(sil) == 1:
                     down_one = sil[0][0] # one dimensional hv is easy
                 else:
@@ -100,7 +99,7 @@ def _zn(rows):
             # now if there's exactly one nadir point, we can compute its
             # one-down hypervolume easily, do another step, and remove it 
             # from the set
-            if nadir_contributors[axis] is not None and nadir_backup[axis] is not None:
+            if False:
                 contributor = nadir_contributors[axis]
                 backup = nadir_backup[axis]
                 offset2 = rows[backup][axis] - rows[contributor][axis]
