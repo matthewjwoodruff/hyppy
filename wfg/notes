@@ -64,3 +64,12 @@ ran.50pts.3d.20 2 314.96
 ran.50pts.3d.20 3 663.07
 
 Now that's way fewer calls, and way less heap allocation!
+
+How's that do for time, if we take out the bookkeeping?
+$ time python metricsystem.py -M -s "#" --ZN ran.50pts.3d.20 
+input front number hv
+... snip correct output ...
+real    0m1.653s
+user    0m1.643s
+sys     0m0.007s
+

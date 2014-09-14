@@ -6,8 +6,6 @@ Matthew Woodruff
 2014-09-10
 LGPL
 """
-calls_at_level = dict()
-
 def sort(rows):
     """
     true Pareto sort assuming maximization
@@ -56,10 +54,6 @@ def _zn(rows):
     rows: the set of rows for which to compute hypervolume
     Assume maximization relative to origin.
     """
-    global calls_at_level
-    level = len(rows[0])
-    calls_at_level[level] = calls_at_level.get(level, 0)
-    calls_at_level[level] += 1
 
     nobj = len(rows[0])
     if nobj == 0:
@@ -98,8 +92,5 @@ def _zn(rows):
     return vol
 
 def zn(rows):
-    global calls_at_level
     hv = _zn(rows)
-    print(calls_at_level)
-    calls_at_level = dict()
     return hv
