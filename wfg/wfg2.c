@@ -55,6 +55,10 @@ int nobj = 0;   // nobj for the biggest front we're going to have to deal with
 OBJECTIVE* suspect_address;
 OBJECTIVE** suspect_address_holder;
 
+int current_recursion_depth=0;
+int calls_at_recursion_depth[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+int maximum_recursion_depth = 20;
+
 double hv(FRONT);
 
 int compare_tree_asc( const void *p1, const void *p2)
@@ -173,6 +177,13 @@ double exclhv(FRONT ps, int p)
 double hv(FRONT ps)
 // returns the hypervolume of ps[0 ..] 
 {
+  int temporary_index = 0;
+  if(current_recursion_depth < maximum_recursion_depth){
+      temporary_index = current_recursion_depth;}
+  else {temporary_index = maximum_recursion_depth;}
+  calls_at_recursion_depth[temporary_index] += 1;
+  current_recursion_depth += 1;
+
   qsort(ps.points, ps.nPoints, sizeof(POINT), greater);
   if (nobj == 2) return hv2(ps);
   double volume = 0;
@@ -184,6 +195,7 @@ double hv(FRONT ps)
     volume += fabs(ps.points[i].objectives[nobj]) * exclhv(ps, i);
 
   nobj++; 
+  current_recursion_depth -= 1;
   return volume;
 }
 
@@ -262,6 +274,12 @@ double compute_hypervolume(FRONT* front)
 }
 
 double hypervolume(int number_of_objectives, int number_of_points, double* values){
+    current_recursion_depth = 0;
+    for(int temporary_index=0; temporary_index < maximum_recursion_depth; temporary_index++){
+        calls_at_recursion_depth[temporary_index] = 0;
+    }
+
+
     FRONT front;
     // allocate points for the front
     front.points = malloc(sizeof(POINT) * number_of_points);
@@ -286,5 +304,11 @@ double hypervolume(int number_of_objectives, int number_of_points, double* value
 
     double computed_hv = compute_hypervolume(&front);
     cleanup_front(&front);
+
+    for(int temporary_index=0; temporary_index < 13; temporary_index++){
+        printf("%d: %d,  ",temporary_index, calls_at_recursion_depth[temporary_index]);
+    }
+    printf("\n");
+
     return computed_hv;
 }
