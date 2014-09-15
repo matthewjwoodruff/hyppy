@@ -74,6 +74,8 @@ def _zn(rows):
     while len(rows) > 0:
         # find hypervolume one dimension down for each silhouette
         for axis in range(nobj):
+            if len(rows) == 0:
+                break
             nadir = float("inf")
             nadir_index = None
             secondary_nadir = float("inf")
@@ -105,8 +107,11 @@ def _zn(rows):
 
             # Now if there's exactly one nadir point and it's in the silhouette, 
             # we can compute its one-down hypervolume easily, do another step, 
-            # and remove it from the set
-            if nadir in carry_along and secondary_nadir != float("inf"):
+            # and remove it from the set.  Except not really.
+            # The secondary nadir is not sufficient. We also need the one-down
+            # hypervolume of points that are one-down dominated only by the nadir
+            # point we're removing.
+            if nadir in carry_along and secondary_nadir != float("inf") and False:
                 remove_point = sil[carry_along.index(nadir)]
                 offset2 = secondary_nadir - nadir
                 subtract_box = sum([x**2 for x in remove_point])
