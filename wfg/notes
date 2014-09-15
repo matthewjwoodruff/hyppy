@@ -122,5 +122,27 @@ hv(18) = 249.7652859076
 hv(19) = 579.9724835200
 hv(20) = 379.7277340091
 
-Anyway, note that we didn't get any fewer recursions.  So something's wrong ---
-we should have had fewer steps and thus fewer recursions.
+Anyway, note that we didn't get any fewer recursions.  So something's
+wrong --- we should have had fewer steps and thus fewer recursions.
+
+First step is to see whether we're doing it at all.  Which we're not,
+so there's the problem.  Ah ha, I found the problem.  An if that
+should have been an elif.  But I still get the wrong numbers.
+
+And here's why.  The point I'm looking for must be in the silhouette,
+but it must also be a nadir point for the axis we're working on.  Is
+even that enough to be correct?  So the idea is that no other point
+overlaps its hypervolume because it's the nadir point for that axis.
+
+Hmmm.  Even with that more restrictive condition, I'm still way
+under-computing hypervolume:
+
+{2: 27, 3: 1}
+ran.50pts.3d.20 1 323.49
+{2: 24, 3: 1}
+ran.50pts.3d.20 2 187.44
+{2: 24, 3: 1}
+ran.50pts.3d.20 3 617.11
+{2: 27, 3: 1}
+ran.50pts.3d.20 4 294.83
+

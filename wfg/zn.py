@@ -60,7 +60,8 @@ def _zn(rows):
     rows: the set of rows for which to compute hypervolume
     Assume maximization relative to origin.
     """
-
+    if len(rows) == 0:
+        return 0
     global calls_at_level
     calls_at_level[len(rows[0])] = calls_at_level.get(len(rows[0]), 0)
     calls_at_level[len(rows[0])] += 1
@@ -71,19 +72,24 @@ def _zn(rows):
     vol = 0.0
 
     while len(rows) > 0:
-        nadir = [float("inf")]*nobj
-
-        for rowindex, row in enumerate(rows):
-            for i, val in enumerate(row):
-                if val < nadir[i]:
-                    nadir[i] = val
-
         # find hypervolume one dimension down for each silhouette
         for axis in range(nobj):
+            nadir = float("inf")
+            nadir_index = None
+            secondary_nadir = float("inf")
+
+            for rowindex, row in enumerate(rows):
+                if row[axis] < nadir:
+                    secondary_nadir = nadir
+                    nadir = row[axis]
+                    nadir_index = rowindex
+                elif row[axis] == nadir:
+                    nadir_index = None
+
             sil = []
             carry_along = []
 
-            offset = nadir[axis]
+            offset = nadir
             if nobj > 1:
                 for row in rows:
                     sil.append([row[i] for i in range(nobj) if i != axis])
@@ -97,40 +103,25 @@ def _zn(rows):
                 down_one = 1.0
             vol += offset * down_one
 
-            # now if there's exactly one nadir point, we can compute its
-            # one-down hypervolume easily, do another step, and remove it 
-            # from the set
-            if len(carry_along) > 1:
-                least = float("inf")
-                second_least = float("inf")
-                lindex  = None
-                slindex = None
-                for idx, calong in enumerate(carry_along):
-                    if calong < least:
-                        second_least = least
-                        slindex = lindex
-                        least = calong
-                        lindex = idx
-                    if calong == least:
-                        lindex = None
-                        slindex = None
-                    elif calong < second_least:
-                        second_least = calong
-                        slindex = idx
-                if lindex is not None and slindex is not None:
-                    offset2 = carry_along[slindex] - carry_along[lindex]
-                    subtract_box = sum([sil[lindex][i]**2 for i in range(nobj-1)])
-                    vol += offset2 * down_one
-                    vol -= offset2 * subtract_box
-                    offset += offset2
+            # Now if there's exactly one nadir point and it's in the silhouette, 
+            # we can compute its one-down hypervolume easily, do another step, 
+            # and remove it from the set
+            if nadir in carry_along and secondary_nadir != float("inf"):
+                remove_point = sil[carry_along.index(nadir)]
+                offset2 = secondary_nadir - nadir
+                subtract_box = sum([x**2 for x in remove_point])
+                vol += offset2 * down_one
+                vol -= offset2 * subtract_box
+                #print("subtracted!")
+                #exit()
+                offset += offset2
 
-            for row in rows: # translates to nadir
-                row[axis] -= offset
-
-        # discard points that are at zero or less
-        rows = [
-                r for r in rows 
-                if not any([x <= 0 for x in r])]
+            newrows = []
+            for row in rows:
+                if row[axis] > offset:
+                    row[axis] -= offset
+                    newrows.append(row)
+            rows = newrows
 
     return vol
 
