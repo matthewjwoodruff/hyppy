@@ -18,12 +18,10 @@ metricsystem.py
 """
 
 import argparse
-import ctypes
 import sys
 import math
 import pareto
 import wfg
-import zn
 
 class InputError(Exception): pass
 class ReferencePointError(Exception): pass
@@ -289,8 +287,6 @@ def get_args(argv):
              'counter will not be incremented even if it would '\
              'be appropriate to do so.')
 
-    parser.add_argument("--ZN", action='store_true',
-            help='use ZN hypervolume algorithm rather than WFG')
     args = parser.parse_args(argv)
     args.objectives = rerange(args.objectives)
     args.maximize = rerange(args.maximize)
@@ -693,7 +689,7 @@ def _convert_objectives_from_named_columns(decorowset, **kwargs):
               "does not contain all of the specified objectives"
         msg = msg.format(number, about['name'], len(rowset) - 1)
         raise InputError(msg)
-    return _objectives_from_indexed_columns(
+    return _convert_objectives_from_indexed_columns(
         decorowset, objectives=column_indices, **kwargs)
 
 def _convert_objectives_from_all_columns(decorowset, **kwargs):
@@ -901,7 +897,7 @@ def hypervolume(rows, **kwargs):
     scale = kwargs.get('scale', None)
     if scale is not None and scale != 'none':
         if scale == 'epsilon' and epsilons is not None:
-            if integer is False: # if true, scale is already applied
+            if kwargs.get('integer', False) is False: # if true, scale is already applied
                 # scale reference point
                 if reference is not None:
                     for i, val in enumerate(reference):
@@ -930,11 +926,7 @@ def hypervolume(rows, **kwargs):
                     val = reference[i]
                 row[i] = reference[i] - val
 
-    # finally!  compute hypervolume
-    if kwargs.get('ZN', False) is True:
-        hv = zn.zn(objective_rows)
-    else:
-        hv = wfg.wfg(objective_rows)
+    hv = wfg.wfg(objective_rows)
     return hv
 
 def nadir(rows):
@@ -944,11 +936,11 @@ def nadir(rows):
     rows (list of lists): data to convert
     returns nadir point
     """
-    nadir = [x for x in rows[0] if isinstance(x, float)]
+    _nadir = [x for x in rows[0] if isinstance(x, float)]
     for row in rows[1:]:
         current = [x for x in row if isinstance(x, float)]
-        nadir = [max([n, x]) for n,x in zip(nadir, current)]
-    return nadir
+        _nadir = [max([n, x]) for n,x in zip(_nadir, current)]
+    return _nadir
 
 def zenith(rows):
     """
@@ -957,11 +949,11 @@ def zenith(rows):
     rows (list of lists): data to convert
     returns zenith point
     """
-    zenith = [x for x in rows[0] if isinstance(x, float)]
+    _zenith = [x for x in rows[0] if isinstance(x, float)]
     for row in rows[1:]:
         current = [x for x in row if isinstance(x, float)]
-        zenith = [min([n, x]) for n,x in zip(zenith, current)]
-    return zenith
+        _zenith = [min([n, x]) for n,x in zip(_zenith, current)]
+    return _zenith
 
 def apply_maximization(rows, **kwargs):
     """
@@ -972,6 +964,7 @@ def apply_maximization(rows, **kwargs):
     maximize_column_names =  kwargs.get('maximize_column_names', None)
 
     if maximize is None and maximize_column_names is not None:
+        header = kwargs.get('header', None)
         if header is not None:
             try:
                 maximize = [header.index(col) for col in maximize_column_names]
